@@ -1,0 +1,21 @@
+api:
+  port: 8080
+  grpc_port: 9090
+  read_timeout: 30s
+  write_timeout: 30s
+
+auth:
+  mode: jwt                        # jwt | apikey | oidc
+  jwt_secret: ""                   # set via KRANE_JWT_SECRET env var
+  oidc_issuer: ""
+
+core:
+  address: "kranix-core:50051"      # gRPC address of kranix-core
+
+logging:
+  level: info
+  format: json
+
+audit:
+  enabled: true
+  sink: stdout                     # stdout | file | kafka
