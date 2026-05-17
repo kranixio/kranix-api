@@ -61,6 +61,9 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkloadCost)
 	mux.HandleFunc("GET /api/v1/cost/summary", handleGetCostSummary)
 
+	// Pods
+	mux.HandleFunc("GET /api/v1/workloads/", handleListPods)
+
 	// Templates
 	mux.HandleFunc("GET /api/v1/templates", handleListTemplates)
 	mux.HandleFunc("POST /api/v1/templates/get", handleGetTemplate)
