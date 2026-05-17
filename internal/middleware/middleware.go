@@ -122,6 +122,70 @@ func Auth(mode, jwtSecret, oidcIssuer string) func(http.Handler) http.Handler {
 	}
 }
 
+// RequirePermission enforces fine-grained API key scope permissions.
+func RequirePermission(resourceType auth.ResourceType, scope auth.Scope) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract API key from context (set by Auth middleware)
+			apiKey, ok := r.Context().Value("apiKey").(*auth.APIKey)
+			if !ok {
+				// If no API key in context, check for JWT claims
+				claims, ok := r.Context().Value("claims").(*auth.Claims)
+				if !ok {
+					http.Error(w, "Authentication required", http.StatusUnauthorized)
+					return
+				}
+				// For JWT, check if user has admin role
+				if auth.HasRole(claims, "admin") {
+					next.ServeHTTP(w, r)
+					return
+				}
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
+			}
+
+			// Extract resource ID from URL path
+			resourceID := extractResourceID(r.URL.Path)
+
+			// Check permission
+			if !auth.HasPermission(apiKey, resourceType, scope, resourceID) {
+				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// extractResourceID extracts a resource ID from the URL path.
+func extractResourceID(path string) string {
+	parts := splitPath(path)
+	if len(parts) >= 4 && parts[1] == "v1" {
+		// Pattern: /api/v1/{resource}/{id}
+		return parts[3]
+	}
+	return ""
+}
+
+// splitPath splits a URL path into segments.
+func splitPath(path string) []string {
+	var parts []string
+	start := 0
+	for i, c := range path {
+		if c == '/' {
+			if i > start {
+				parts = append(parts, path[start:i])
+			}
+			start = i + 1
+		}
+	}
+	if start < len(path) {
+		parts = append(parts, path[start:])
+	}
+	return parts
+}
+
 // RateLimit implements rate limiting.
 func RateLimit(requestsPerSecond int) func(http.Handler) http.Handler {
 	// Simple in-memory rate limiter

@@ -1,0 +1,489 @@
+# GraphQL Schema for Kranix API
+
+scalar Time
+
+type Workload {
+  id: ID!
+  name: String!
+  namespace: String!
+  spec: WorkloadSpec!
+  status: WorkloadStatus!
+  createdAt: Time!
+  updatedAt: Time!
+  labels: [Label!]!
+  tenant: TenantInfo
+}
+
+type WorkloadSpec {
+  name: String!
+  namespace: String
+  image: String!
+  replicas: Int!
+  env: [EnvVar!]!
+  command: String
+  resources: ResourceSpec
+  ports: [PortSpec!]!
+  backend: String!
+  composeFile: String
+  rolloutStrategy: RolloutStrategy
+  autoScaling: AutoScalingConfig
+  scheduling: SchedulingConfig
+  dependencies: [Dependency!]!
+  failurePrediction: FailurePrediction
+}
+
+type WorkloadStatus {
+  id: ID!
+  name: String!
+  namespace: String
+  state: String!
+  image: String
+  replicas: Int
+  ready: Int
+  host: String
+  pods: [String!]!
+  phase: WorkloadPhase!
+  readyReplicas: Int!
+  message: String
+  lastUpdated: Time!
+}
+
+enum WorkloadPhase {
+  Pending
+  Deploying
+  Running
+  Degraded
+  Failed
+}
+
+type ResourceSpec {
+  cpuRequest: String
+  cpuLimit: String
+  memoryRequest: String
+  memoryLimit: String
+}
+
+type PortSpec {
+  name: String
+  containerPort: Int!
+  protocol: String
+}
+
+type RolloutStrategy {
+  type: String!
+  maxUnavailable: Int
+  maxSurge: Int
+  canaryConfig: CanaryConfig
+  abTestConfig: ABTestConfig
+}
+
+type AutoScalingConfig {
+  enabled: Boolean!
+  minReplicas: Int!
+  maxReplicas: Int!
+  targetCPUUtilization: Int
+  targetMemoryUtilization: Int
+  customMetrics: [CustomMetric!]!
+  scaleDownCooldownSeconds: Int
+  scaleUpCooldownSeconds: Int
+}
+
+type CustomMetric {
+  name: String!
+  type: String!
+  metricName: String!
+  target: MetricTarget!
+}
+
+type MetricTarget {
+  type: String!
+  averageValue: String
+  value: String
+}
+
+type SchedulingConfig {
+  costAware: Boolean
+  preferredRegions: [String!]!
+  preferredZones: [String!]!
+  nodeSelectors: [Label!]!
+  affinity: AffinityConfig
+  tolerations: [Toleration!]!
+  maxCostPerHour: String
+}
+
+type AffinityConfig {
+  nodeAffinity: NodeAffinity
+  podAffinity: PodAffinity
+  podAntiAffinity: PodAffinity
+}
+
+type NodeAffinity {
+  requiredDuringScheduling: [NodeSelectorTerm!]!
+  preferredDuringScheduling: [PreferredSchedulingTerm!]!
+}
+
+type PodAffinity {
+  requiredDuringScheduling: [PodAffinityTerm!]!
+  preferredDuringScheduling: [WeightedPodAffinityTerm!]!
+}
+
+type Dependency {
+  workloadId: ID!
+  type: String!
+  condition: String
+  timeout: String
+}
+
+type FailurePrediction {
+  enabled: Boolean!
+  modelType: String!
+  predictionWindow: String
+  threshold: Float!
+  features: [String!]!
+  mitigationActions: [String!]!
+}
+
+type TenantInfo {
+  id: ID!
+  name: String!
+  namespace: String!
+  labels: [Label!]!
+  quota: TenantQuota
+  isolation: TenantIsolation
+}
+
+type TenantQuota {
+  maxCPU: String
+  maxMemory: String
+  maxWorkloads: Int
+  maxReplicas: Int
+  maxStorage: String
+  maxCustomMetrics: Int
+}
+
+type TenantIsolation {
+  networkPolicy: Boolean!
+  resourceQuota: Boolean!
+  limitRange: Boolean!
+  podSecurityPolicy: Boolean!
+  storageClass: String
+}
+
+type Namespace {
+  id: ID!
+  name: String!
+  labels: [Label!]!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Pod {
+  id: ID!
+  name: String!
+  namespace: String!
+  workloadId: ID!
+  status: String!
+  host: String
+  createdAt: Time!
+}
+
+type Event {
+  id: ID!
+  workloadId: ID!
+  type: String!
+  timestamp: Time!
+  data: String
+}
+
+type Webhook {
+  id: ID!
+  name: String!
+  url: String!
+  secret: String
+  events: [WebhookEvent!]!
+  enabled: Boolean!
+  headers: [Label!]!
+  createdAt: Time!
+  updatedAt: Time!
+  createdBy: String
+  tenantId: String
+}
+
+enum WebhookEvent {
+  deploy_start
+  deploy_success
+  deploy_failure
+  workload_created
+  workload_updated
+  workload_deleted
+  scale_up
+  scale_down
+  health_check_fail
+  drift_detected
+  rollback_start
+  rollback_complete
+}
+
+type APIKey {
+  id: ID!
+  name: String!
+  key: String!
+  permissions: [Permission!]!
+  expiresAt: Time
+  createdAt: Time!
+  createdBy: String
+  tenantId: String
+  revoked: Boolean!
+}
+
+type Permission {
+  resourceType: String!
+  resourceId: String
+  scope: String!
+}
+
+type Label {
+  key: String!
+  value: String!
+}
+
+type EnvVar {
+  key: String!
+  value: String!
+}
+
+type Query {
+  # Workloads
+  workloads(namespace: String, limit: Int, offset: Int): [Workload!]!
+  workload(id: ID!): Workload
+  
+  # Pods
+  pods(workloadId: ID!): [Pod!]!
+  pod(id: ID!): Pod
+  
+  # Namespaces
+  namespaces: [Namespace!]!
+  namespace(id: ID!): Namespace
+  
+  # Events
+  events(workloadId: ID!, limit: Int): [Event!]!
+  event(id: ID!): Event
+  
+  # Webhooks
+  webhooks: [Webhook!]!
+  webhook(id: ID!): Webhook
+  
+  # API Keys
+  apiKeys: [APIKey!]!
+  apiKey(id: ID!): APIKey
+}
+
+type Mutation {
+  # Workloads
+  deployWorkload(spec: WorkloadSpecInput!): Workload!
+  updateWorkload(id: ID!, spec: WorkloadSpecInput!): Workload!
+  deleteWorkload(id: ID!): Boolean!
+  restartWorkload(id: ID!): Workload!
+  
+  # Namespaces
+  createNamespace(name: String!, labels: [LabelInput!]): Namespace!
+  deleteNamespace(id: ID!): Boolean!
+  
+  # Webhooks
+  createWebhook(input: WebhookInput!): Webhook!
+  updateWebhook(id: ID!, input: WebhookInput!): Webhook!
+  deleteWebhook(id: ID!): Boolean!
+  
+  # API Keys
+  createAPIKey(input: APIKeyInput!): APIKey!
+  revokeAPIKey(id: ID!): Boolean!
+}
+
+input WorkloadSpecInput {
+  name: String!
+  namespace: String
+  image: String!
+  replicas: Int!
+  env: [EnvVarInput!]!
+  command: String
+  resources: ResourceSpecInput
+  ports: [PortSpecInput!]!
+  backend: String!
+  composeFile: String
+  rolloutStrategy: RolloutStrategyInput
+  autoScaling: AutoScalingConfigInput
+  scheduling: SchedulingConfigInput
+  dependencies: [DependencyInput!]!
+  failurePrediction: FailurePredictionInput
+}
+
+input ResourceSpecInput {
+  cpuRequest: String
+  cpuLimit: String
+  memoryRequest: String
+  memoryLimit: String
+}
+
+input PortSpecInput {
+  name: String
+  containerPort: Int!
+  protocol: String
+}
+
+input RolloutStrategyInput {
+  type: String!
+  maxUnavailable: Int
+  maxSurge: Int
+  canaryConfig: CanaryConfigInput
+  abTestConfig: ABTestConfigInput
+}
+
+input AutoScalingConfigInput {
+  enabled: Boolean!
+  minReplicas: Int!
+  maxReplicas: Int!
+  targetCPUUtilization: Int
+  targetMemoryUtilization: Int
+  customMetrics: [CustomMetricInput!]!
+  scaleDownCooldownSeconds: Int
+  scaleUpCooldownSeconds: Int
+}
+
+input CustomMetricInput {
+  name: String!
+  type: String!
+  metricName: String!
+  target: MetricTargetInput!
+}
+
+input MetricTargetInput {
+  type: String!
+  averageValue: String
+  value: String
+}
+
+input SchedulingConfigInput {
+  costAware: Boolean
+  preferredRegions: [String!]!
+  preferredZones: [String!]!
+  nodeSelectors: [LabelInput!]!
+  affinity: AffinityConfigInput
+  tolerations: [TolerationInput!]!
+  maxCostPerHour: String
+}
+
+input AffinityConfigInput {
+  nodeAffinity: NodeAffinityInput
+  podAffinity: PodAffinityInput
+  podAntiAffinity: PodAffinityInput
+}
+
+input DependencyInput {
+  workloadId: ID!
+  type: String!
+  condition: String
+  timeout: String
+}
+
+input FailurePredictionInput {
+  enabled: Boolean!
+  modelType: String!
+  predictionWindow: String
+  threshold: Float!
+  features: [String!]!
+  mitigationActions: [String!]!
+}
+
+input WebhookInput {
+  name: String!
+  url: String!
+  secret: String
+  events: [WebhookEvent!]!
+  enabled: Boolean!
+  headers: [LabelInput!]
+}
+
+input APIKeyInput {
+  name: String!
+  permissions: [PermissionInput!]!
+  expiresAt: Time
+}
+
+input PermissionInput {
+  resourceType: String!
+  resourceId: String
+  scope: String!
+}
+
+input LabelInput {
+  key: String!
+  value: String!
+}
+
+input EnvVarInput {
+  key: String!
+  value: String!
+}
+
+input CanaryConfigInput {
+  replicas: Int!
+  percentage: Int
+  analysisDuration: String
+  successThreshold: Int
+  metrics: [String!]!
+  autoPromote: Boolean
+}
+
+input ABTestConfigInput {
+  variantA: String!
+  variantB: String!
+  trafficSplit: Int!
+  analysisDuration: String
+  metrics: [String!]!
+  autoSelectWinner: Boolean
+}
+
+input NodeAffinityInput {
+  requiredDuringScheduling: [NodeSelectorTermInput!]!
+  preferredDuringScheduling: [PreferredSchedulingTermInput!]!
+}
+
+input PodAffinityInput {
+  requiredDuringScheduling: [PodAffinityTermInput!]!
+  preferredDuringScheduling: [WeightedPodAffinityTermInput!]!
+}
+
+input NodeSelectorTermInput {
+  matchExpressions: [NodeSelectorRequirementInput!]!
+  matchFields: [NodeSelectorRequirementInput!]!
+}
+
+input NodeSelectorRequirementInput {
+  key: String!
+  operator: String!
+  values: [String!]!
+}
+
+input PreferredSchedulingTermInput {
+  weight: Int!
+  preference: NodeSelectorTermInput!
+}
+
+input PodAffinityTermInput {
+  labelSelector: [LabelInput!]!
+  namespaces: [String!]!
+  topologyKey: String!
+}
+
+input WeightedPodAffinityTermInput {
+  weight: Int!
+  podAffinityTerm: PodAffinityTermInput!
+}
+
+input TolerationInput {
+  key: String
+  operator: String
+  value: String
+  effect: String
+  tolerationSeconds: Int
+}
