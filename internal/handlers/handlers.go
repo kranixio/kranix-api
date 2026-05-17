@@ -35,6 +35,10 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// Drift Detection
 	mux.HandleFunc("GET /api/v1/workloads/", handleGetDriftReports)
 
+	// Health Gate
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetHealthGateStatus)
+	mux.HandleFunc("POST /api/v1/workloads/", handleEvaluateHealthGate)
+
 	// Optional Enhancement Endpoints
 	mux.HandleFunc("GET /api/v1/workloads/", handleGetScalingHistory)
 	mux.HandleFunc("GET /api/v1/workloads/", handleGetRolloutStatus)
@@ -365,6 +369,45 @@ func handleGetPredictions(w http.ResponseWriter, r *http.Request) {
 			"recommended_actions":    []string{"scale_up", "restart"},
 		},
 		"message": "Failure prediction retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetHealthGateStatus handles retrieving health gate status for a workload.
+func handleGetHealthGateStatus(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query health gate status
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id":    workloadID,
+		"overall_status": "passing",
+		"blocked":        false,
+		"results":        []map[string]interface{}{},
+		"message":        "Health gate status retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleEvaluateHealthGate handles evaluating health gates for a workload.
+func handleEvaluateHealthGate(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to evaluate health gates
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id":    workloadID,
+		"overall_status": "passing",
+		"blocked":        false,
+		"message":        "Health gate evaluation not yet implemented - requires kranix-core integration",
 	})
 }
 
