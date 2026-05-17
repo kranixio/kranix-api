@@ -28,6 +28,13 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/namespaces", handleListNamespaces)
 	mux.HandleFunc("DELETE /api/v1/namespaces/", handleDeleteNamespace)
 
+	// Event Sourcing - Event History
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkloadEvents)
+	mux.HandleFunc("GET /api/v1/events/", handleGetEvent)
+
+	// Drift Detection
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetDriftReports)
+
 	// Analysis
 	mux.HandleFunc("GET /api/v1/workloads/", handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", handleGenerateManifests)
@@ -187,6 +194,65 @@ func handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Not yet implemented",
+	})
+}
+
+// handleGetWorkloadEvents handles retrieving event history for a workload.
+func handleGetWorkloadEvents(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// Query parameters
+	fromVersion := r.URL.Query().Get("from_version")
+	limit := r.URL.Query().Get("limit")
+
+	// TODO: Delegate to kranix-core via gRPC to query event sourcing store
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id":  workloadID,
+		"from_version": fromVersion,
+		"limit":        limit,
+		"events":       []map[string]interface{}{},
+		"message":      "Event history query not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetEvent handles retrieving a single event by ID.
+func handleGetEvent(w http.ResponseWriter, r *http.Request) {
+	// Extract event ID from URL path
+	eventID := extractID(r.URL.Path)
+	if eventID == "" {
+		http.Error(w, "Invalid event ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query event sourcing store
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"event_id": eventID,
+		"message":  "Event retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetDriftReports handles retrieving drift detection reports for a workload.
+func handleGetDriftReports(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query drift detection reports
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id": workloadID,
+		"reports":     []map[string]interface{}{},
+		"message":     "Drift report retrieval not yet implemented - requires kranix-core integration",
 	})
 }
 
