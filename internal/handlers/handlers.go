@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/kranix-io/kranix-api/internal/validation"
@@ -49,6 +50,20 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// Analysis
 	mux.HandleFunc("GET /api/v1/workloads/", handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", handleGenerateManifests)
+
+	// AI Assistant
+	mux.HandleFunc("POST /api/v1/ai/ask", handleAIAsk)
+
+	// Diff
+	mux.HandleFunc("POST /api/v1/workloads/", handleDiffWorkload)
+
+	// Cost
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkloadCost)
+	mux.HandleFunc("GET /api/v1/cost/summary", handleGetCostSummary)
+
+	// Templates
+	mux.HandleFunc("GET /api/v1/templates", handleListTemplates)
+	mux.HandleFunc("POST /api/v1/templates/get", handleGetTemplate)
 
 	// Multi-Agent Coordination
 	mux.HandleFunc("POST /api/v1/coordination/tasks", handleCreateTask)
@@ -229,6 +244,198 @@ func handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Not yet implemented",
+	})
+}
+
+// handleAIAsk handles AI assistant queries.
+func handleAIAsk(w http.ResponseWriter, r *http.Request) {
+	var req map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	prompt, _ := req["prompt"].(string)
+	namespace, _ := req["namespace"].(string)
+
+	// TODO: Delegate to kranix-core via gRPC or integrate with AI service
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"response":         fmt.Sprintf("AI analysis for: %s in namespace: %s", prompt, namespace),
+		"suggested_action": "Review workload configuration and resource limits",
+		"code_snippet":     "",
+		"confidence":       0.85,
+		"message":          "AI integration not yet fully implemented - requires kranix-core integration or AI service",
+	})
+}
+
+// handleDiffWorkload handles workload diff requests.
+func handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
+	// Extract workload name from URL path
+	// URL pattern: /api/v1/workloads/{name}/diff
+	workloadName := extractID(r.URL.Path)
+
+	var spec types.WorkloadSpec
+	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to compute diff
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_name": workloadName,
+		"changes": []map[string]interface{}{
+			{
+				"field":       "image",
+				"old_value":   spec.Image,
+				"new_value":   spec.Image,
+				"change_type": "modified",
+			},
+		},
+		"summary": map[string]interface{}{
+			"total_changes": 1,
+			"added":         0,
+			"modified":      1,
+			"removed":       0,
+		},
+		"message": "Diff computation not yet fully implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetWorkloadCost handles getting cost breakdown for a workload.
+func handleGetWorkloadCost(w http.ResponseWriter, r *http.Request) {
+	// Extract workload name from URL path
+	workloadName := extractID(r.URL.Path)
+	namespace := r.URL.Query().Get("namespace")
+	duration := r.URL.Query().Get("duration")
+
+	// TODO: Delegate to kranix-core via gRPC to get cost data
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_name": workloadName,
+		"namespace":     namespace,
+		"duration":      duration,
+		"total_cost":    42.50,
+		"compute_cost":  35.00,
+		"storage_cost":  5.00,
+		"network_cost":  2.50,
+		"breakdown": []map[string]interface{}{
+			{
+				"resource": "CPU",
+				"cost":     25.00,
+				"usage":    "500m",
+			},
+			{
+				"resource": "Memory",
+				"cost":     10.00,
+				"usage":    "1Gi",
+			},
+		},
+		"message": "Cost calculation not yet fully implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetCostSummary handles getting cost summary for a namespace.
+func handleGetCostSummary(w http.ResponseWriter, r *http.Request) {
+	namespace := r.URL.Query().Get("namespace")
+	duration := r.URL.Query().Get("duration")
+
+	// TODO: Delegate to kranix-core via gRPC to get cost summary
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"namespace":      namespace,
+		"duration":       duration,
+		"total_cost":     150.00,
+		"workload_count": 5,
+		"average_cost":   30.00,
+		"top_cost_workloads": []map[string]interface{}{
+			{
+				"workload_name": "app-1",
+				"total_cost":    50.00,
+			},
+			{
+				"workload_name": "app-2",
+				"total_cost":    40.00,
+			},
+		},
+		"message": "Cost summary not yet fully implemented - requires kranix-core integration",
+	})
+}
+
+// handleListTemplates handles listing available templates.
+func handleListTemplates(w http.ResponseWriter, r *http.Request) {
+	// TODO: Delegate to kranix-core or template service
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"templates": []map[string]interface{}{
+			{
+				"name":        "nginx",
+				"description": "Basic nginx web server",
+				"category":    "web",
+				"variables": []map[string]interface{}{
+					{
+						"name":        "PORT",
+						"description": "Container port",
+						"default":     "80",
+						"required":    false,
+					},
+				},
+			},
+			{
+				"name":        "nodejs",
+				"description": "Node.js application server",
+				"category":    "application",
+				"variables": []map[string]interface{}{
+					{
+						"name":        "PORT",
+						"description": "Application port",
+						"default":     "3000",
+						"required":    false,
+					},
+					{
+						"name":        "NODE_ENV",
+						"description": "Node environment",
+						"default":     "production",
+						"required":    false,
+					},
+				},
+			},
+			{
+				"name":        "postgres",
+				"description": "PostgreSQL database",
+				"category":    "database",
+				"variables": []map[string]interface{}{
+					{
+						"name":        "POSTGRES_PASSWORD",
+						"description": "Database password",
+						"default":     "",
+						"required":    true,
+					},
+				},
+			},
+		},
+		"message": "Template listing not yet fully implemented - requires template service integration",
+	})
+}
+
+// handleGetTemplate handles getting a specific template with variables.
+func handleGetTemplate(w http.ResponseWriter, r *http.Request) {
+	var req map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	templateName, _ := req["name"].(string)
+	_, _ = req["vars"].(map[string]string)
+
+	// TODO: Delegate to kranix-core or template service
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"name":    templateName,
+		"content": fmt.Sprintf("# Generated from template: %s\n# Variables: %v\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: %s-app\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: %s\n  template:\n    metadata:\n      labels:\n        app: %s\n    spec:\n      containers:\n      - name: %s\n        image: %s:latest\n", templateName, templateName, templateName, templateName, templateName, templateName, templateName),
+		"message": "Template generation not yet fully implemented - requires template service integration",
 	})
 }
 
