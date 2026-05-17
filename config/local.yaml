@@ -51,3 +51,18 @@ oidc_providers:
     domain: ""
     client_id: ""
     client_secret: ""
+
+ratelimit:
+  enabled: true
+  requests_per_second: 100
+  burst_size: 10
+
+sse:
+  enabled: true
+  max_connections: 1000
+
+apiversion:
+  enabled: true
+  default_version: "1"
+  header_name: "X-API-Version"
+  query_param: "version"
