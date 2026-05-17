@@ -35,6 +35,13 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// Drift Detection
 	mux.HandleFunc("GET /api/v1/workloads/", handleGetDriftReports)
 
+	// Optional Enhancement Endpoints
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetScalingHistory)
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetRolloutStatus)
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetDependencies)
+	mux.HandleFunc("GET /api/v1/tenants/", handleGetTenantQuota)
+	mux.HandleFunc("GET /api/v1/workloads/", handleGetPredictions)
+
 	// Analysis
 	mux.HandleFunc("GET /api/v1/workloads/", handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", handleGenerateManifests)
@@ -253,6 +260,111 @@ func handleGetDriftReports(w http.ResponseWriter, r *http.Request) {
 		"workload_id": workloadID,
 		"reports":     []map[string]interface{}{},
 		"message":     "Drift report retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetScalingHistory handles retrieving scaling history for a workload.
+func handleGetScalingHistory(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query scaling history
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id":    workloadID,
+		"scaling_events": []map[string]interface{}{},
+		"message":        "Scaling history retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetRolloutStatus handles retrieving rollout status for a workload.
+func handleGetRolloutStatus(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query rollout status
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id": workloadID,
+		"rollout_status": map[string]interface{}{
+			"type":       "canary",
+			"phase":      "in_progress",
+			"percentage": 10,
+		},
+		"message": "Rollout status retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetDependencies handles retrieving dependency status for a workload.
+func handleGetDependencies(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query dependency status
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id":  workloadID,
+		"dependencies": []map[string]interface{}{},
+		"message":      "Dependency status retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetTenantQuota handles retrieving tenant quota usage.
+func handleGetTenantQuota(w http.ResponseWriter, r *http.Request) {
+	// Extract tenant ID from URL path
+	tenantID := extractID(r.URL.Path)
+	if tenantID == "" {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query tenant quota
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"tenant_id": tenantID,
+		"quota": map[string]interface{}{
+			"max_cpu":        "16",
+			"max_memory":     "64Gi",
+			"max_workloads":  50,
+			"used_cpu":       "4",
+			"used_memory":    "16Gi",
+			"used_workloads": 12,
+		},
+		"message": "Tenant quota retrieval not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetPredictions handles retrieving failure predictions for a workload.
+func handleGetPredictions(w http.ResponseWriter, r *http.Request) {
+	// Extract workload ID from URL path
+	workloadID := extractID(r.URL.Path)
+	if workloadID == "" {
+		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC to query failure predictions
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"workload_id": workloadID,
+		"predictions": map[string]interface{}{
+			"failure_probability":    0.15,
+			"predicted_failure_time": "2026-05-17T15:30:00Z",
+			"recommended_actions":    []string{"scale_up", "restart"},
+		},
+		"message": "Failure prediction retrieval not yet implemented - requires kranix-core integration",
 	})
 }
 
