@@ -49,6 +49,30 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// Analysis
 	mux.HandleFunc("GET /api/v1/workloads/", handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", handleGenerateManifests)
+
+	// Multi-Agent Coordination
+	mux.HandleFunc("POST /api/v1/coordination/tasks", handleCreateTask)
+	mux.HandleFunc("GET /api/v1/coordination/tasks", handleListTasks)
+	mux.HandleFunc("GET /api/v1/coordination/tasks/", handleGetTask)
+	mux.HandleFunc("PATCH /api/v1/coordination/tasks/", handleUpdateTaskStatus)
+	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleDelegateTask)
+	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleClaimTask)
+	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleCreateSubtask)
+
+	// Dry-Run Mode
+	mux.HandleFunc("POST /api/v1/dryrun/mode", handleSetDryRunMode)
+	mux.HandleFunc("GET /api/v1/dryrun/mode", handleGetDryRunMode)
+	mux.HandleFunc("GET /api/v1/dryrun/preview", handleGetDryRunPreview)
+	mux.HandleFunc("DELETE /api/v1/dryrun/actions", handleClearDryRunActions)
+
+	// Incident Response
+	mux.HandleFunc("GET /api/v1/incident/runbooks", handleListRunbooks)
+	mux.HandleFunc("GET /api/v1/incident/runbooks/", handleGetRunbook)
+	mux.HandleFunc("POST /api/v1/incident/runbooks", handleCreateRunbook)
+	mux.HandleFunc("POST /api/v1/incident/runbooks/", handleExecuteRunbook)
+	mux.HandleFunc("GET /api/v1/incident/executions", handleListExecutions)
+	mux.HandleFunc("GET /api/v1/incident/executions/", handleGetExecution)
+	mux.HandleFunc("DELETE /api/v1/incident/executions/", handleCancelExecution)
 }
 
 // handleDeployWorkload handles workload deployment requests.
@@ -437,4 +461,271 @@ func splitPath(path string) []string {
 		parts = append(parts, path[start:])
 	}
 	return parts
+}
+
+// Multi-Agent Coordination Handlers
+
+// handleCreateTask handles creating a new coordination task.
+func handleCreateTask(w http.ResponseWriter, r *http.Request) {
+	var task map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Task creation not yet implemented - requires kranix-core integration",
+		"task":    task,
+	})
+}
+
+// handleListTasks handles listing coordination tasks.
+func handleListTasks(w http.ResponseWriter, r *http.Request) {
+	agentID := r.URL.Query().Get("agent_id")
+	status := r.URL.Query().Get("status")
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"agent_id": agentID,
+		"status":   status,
+		"tasks":    []map[string]interface{}{},
+		"message":  "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetTask handles getting a specific task.
+func handleGetTask(w http.ResponseWriter, r *http.Request) {
+	taskID := extractID(r.URL.Path)
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"task_id": taskID,
+		"message": "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleUpdateTaskStatus handles updating task status.
+func handleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
+	taskID := extractID(r.URL.Path)
+	var update map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"task_id": taskID,
+		"update":  update,
+		"message": "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleDelegateTask handles delegating a task to another agent.
+func handleDelegateTask(w http.ResponseWriter, r *http.Request) {
+	taskID := extractID(r.URL.Path)
+	var delegation map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&delegation); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"task_id":    taskID,
+		"delegation": delegation,
+		"message":    "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleClaimTask handles claiming a pending task.
+func handleClaimTask(w http.ResponseWriter, r *http.Request) {
+	taskID := extractID(r.URL.Path)
+	var claim map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&claim); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"task_id": taskID,
+		"claim":   claim,
+		"message": "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleCreateSubtask handles creating a sub-task.
+func handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
+	taskID := extractID(r.URL.Path)
+	var subtask map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&subtask); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"parent_task_id": taskID,
+		"subtask":        subtask,
+		"message":        "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// Dry-Run Mode Handlers
+
+// handleSetDryRunMode handles setting the dry-run mode.
+func handleSetDryRunMode(w http.ResponseWriter, r *http.Request) {
+	var modeReq map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&modeReq); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Dry-run mode setting not yet implemented - requires kranix-core integration",
+		"mode":    modeReq,
+	})
+}
+
+// handleGetDryRunMode handles getting the current dry-run mode.
+func handleGetDryRunMode(w http.ResponseWriter, r *http.Request) {
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"mode":    "disabled",
+		"message": "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetDryRunPreview handles getting dry-run preview.
+func handleGetDryRunPreview(w http.ResponseWriter, r *http.Request) {
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"actions": []map[string]interface{}{},
+		"message": "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleClearDryRunActions handles clearing dry-run actions.
+func handleClearDryRunActions(w http.ResponseWriter, r *http.Request) {
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Dry-run actions cleared - not yet fully implemented - requires kranix-core integration",
+	})
+}
+
+// Incident Response Handlers
+
+// handleListRunbooks handles listing incident runbooks.
+func handleListRunbooks(w http.ResponseWriter, r *http.Request) {
+	category := r.URL.Query().Get("category")
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"category": category,
+		"runbooks": []map[string]interface{}{},
+		"message":  "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetRunbook handles getting a specific runbook.
+func handleGetRunbook(w http.ResponseWriter, r *http.Request) {
+	runbookID := extractID(r.URL.Path)
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"runbook_id": runbookID,
+		"message":    "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleCreateRunbook handles creating a new runbook.
+func handleCreateRunbook(w http.ResponseWriter, r *http.Request) {
+	var runbook map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&runbook); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Runbook creation not yet implemented - requires kranix-core integration",
+		"runbook": runbook,
+	})
+}
+
+// handleExecuteRunbook handles executing a runbook.
+func handleExecuteRunbook(w http.ResponseWriter, r *http.Request) {
+	runbookID := extractID(r.URL.Path)
+	var executionReq map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&executionReq); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"runbook_id": runbookID,
+		"execution":  executionReq,
+		"message":    "Runbook execution not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleListExecutions handles listing runbook executions.
+func handleListExecutions(w http.ResponseWriter, r *http.Request) {
+	runbookID := r.URL.Query().Get("runbook_id")
+	status := r.URL.Query().Get("status")
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"runbook_id": runbookID,
+		"status":     status,
+		"executions": []map[string]interface{}{},
+		"message":    "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleGetExecution handles getting a specific execution.
+func handleGetExecution(w http.ResponseWriter, r *http.Request) {
+	executionID := extractID(r.URL.Path)
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"execution_id": executionID,
+		"message":      "Not yet implemented - requires kranix-core integration",
+	})
+}
+
+// handleCancelExecution handles canceling a running execution.
+func handleCancelExecution(w http.ResponseWriter, r *http.Request) {
+	executionID := extractID(r.URL.Path)
+
+	// TODO: Delegate to kranix-core via gRPC
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"execution_id": executionID,
+		"message":      "Execution cancellation not yet implemented - requires kranix-core integration",
+	})
 }
