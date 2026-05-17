@@ -8,12 +8,14 @@
 
 ## What it does
 
-- Exposes a versioned REST API (`/api/v1/...`) and a gRPC service
+- Exposes a versioned REST API (`/api/v1/...`, `/api/v2/...`) and a gRPC service
 - Handles authentication (API keys, JWT, OIDC)
 - Validates and sanitizes all incoming requests
 - Translates HTTP/gRPC requests into `kranix-core` operations
 - Streams logs and events back to callers over SSE / gRPC streams
 - Emits audit logs for every mutating action
+- Enforces rate limiting and per-namespace resource quotas
+- Supports API versioning with deprecation warnings
 
 ---
 
@@ -71,11 +73,39 @@ http://localhost:8080/api/v1
 | `GET` | `/workloads/:id/analyze` | AI-powered failure analysis |
 | `POST` | `/manifests/generate` | Generate K8s manifests from intent |
 
+### Rate limiting & Quotas
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/quota` | Set namespace quota |
+| `GET` | `/quota/{namespace}` | Get namespace quota |
+| `GET` | `/quota/{namespace}/usage` | Get quota usage |
+| `GET` | `/quota` | List all quotas |
+| `DELETE` | `/quota/{namespace}` | Delete namespace quota |
+
+### SSE Streaming
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/sse` | SSE connection for live events |
+| `GET` | `/api/sse/stats` | SSE connection statistics |
+| `POST` | `/api/sse/broadcast` | Broadcast events (testing) |
+
+### API Versioning
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/versions` | List all API versions |
+| `GET` | `/api/versions/{version}` | Get version information |
+
 ---
 
 ## Authentication
 
-All requests require an `Authorization` header:
+All requests require an `Authorization` header:, API versioning
+│   ├── ratelimit/        # Rate limiting and quota enforcement
+│   ├── sse/              # SSE streaming service
+│   ├── apiversion/       # API versioning manager
 
 ```
 Authorization: Bearer <token>
@@ -143,6 +173,21 @@ buf generate
 ### Run tests
 
 ```bash
+
+ratelimit:
+  enabled: true
+  requests_per_second: 100
+  burst_size: 10
+
+sse:
+  enabled: true
+  max_connections: 1000
+
+apiversion:
+  enabled: true
+  default_version: "1"
+  header_name: "X-API-Version"
+  query_param: "version"
 go test ./...
 go test ./tests/e2e/... -tags e2e   # requires running kranix-core
 ```
@@ -185,6 +230,59 @@ audit:
 | `kranix-mcp` | Calls this API over HTTP on behalf of AI agents |
 | `kranix-core` | This API delegates all business logic to core |
 | `kranix-packages` | Imports shared types, errors, and auth primitives |
+
+---
+
+## Rate limiting & Quotas
+
+The API enforces rate limiting per client (based on API key or IP address) and per-namespace resource quotas.
+
+### Rate limiting
+
+- **Token bucket algorithm** with configurable requests per second and burst size
+- Clients identified by API key (`X-API-Key` header) or IP address
+- Rate limit headers returned: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`
+
+### Namespace quotas
+
+- Set resource limits per namespace (max workloads, CPU, memory, storage)
+- Quota usage tracked in real-time
+- Quota enforcement prevents resource exhaustion
+
+---
+
+## SSE Streaming
+
+The API provides Server-Sent Events (SSE) for real-time event streaming:
+
+- **Connection endpoint:** `GET /api/sse?client_id=...&namespace=...`
+- **Event types:** `workload.changed`, `workload.created`, `workload.deleted`
+- **Filtering:** Subscribe to specific namespaces or all namespaces
+- **Automatic reconnection:** Clients can reconnect with retry intervals
+
+---
+
+## API Versioning
+
+The API supports multiple versions running side by side:
+
+### Version selection
+
+- **Header:** `X-API-Version: 1` or `X-API-Version: 2`
+- **Query param:** `?version=1` or `?version=2`
+- **URL path:** `/api/v1/...` or `/api/v2/...`
+
+### Version status
+
+- **v1:** Stable, production-ready
+- **v2:** Beta, new features
+
+### Deprecation
+
+Deprecated versions return warning headers:
+- `X-API-Deprecated: true`
+- `X-API-Sunset-Date: YYYY-MM-DD`
+- `Warning: 299 - "API version is deprecated"`
 
 ---
 
