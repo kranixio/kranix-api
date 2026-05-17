@@ -12,12 +12,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kranix-io/kranix-api/internal/analytics"
 	"github.com/kranix-io/kranix-api/internal/apikeys"
 	"github.com/kranix-io/kranix-api/internal/graphql"
 	"github.com/kranix-io/kranix-api/internal/handlers"
 	"github.com/kranix-io/kranix-api/internal/middleware"
+	"github.com/kranix-io/kranix-api/internal/oidc"
 	"github.com/kranix-io/kranix-api/internal/stream"
+	"github.com/kranix-io/kranix-api/internal/version"
 	"github.com/kranix-io/kranix-api/internal/webhooks"
+	"github.com/kranix-io/kranix-packages/auth"
 	"github.com/kranix-io/kranix-packages/logging"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
@@ -32,12 +36,16 @@ type Config struct {
 		WriteTimeout   time.Duration `yaml:"write_timeout"`
 		GraphQLEnabled bool          `yaml:"graphql_enabled"`
 		GraphQLPath    string        `yaml:"graphql_path"`
+		Version        string        `yaml:"version"`
 	} `yaml:"api"`
 	Auth struct {
-		Mode         string `yaml:"mode"` // jwt | apikey | oidc
-		JWTSecret    string `yaml:"jwt_secret"`
-		OIDCIssuer   string `yaml:"oidc_issuer"`
-		EnableScopes bool   `yaml:"enable_scopes"`
+		Mode            string        `yaml:"mode"` // jwt | apikey | oidc
+		JWTSecret       string        `yaml:"jwt_secret"`
+		OIDCIssuer      string        `yaml:"oidc_issuer"`
+		EnableScopes    bool          `yaml:"enable_scopes"`
+		OIDCEnabled     bool          `yaml:"oidc_enabled"`
+		OIDCCallbackURL string        `yaml:"oidc_callback_url"`
+		OIDCSessionTTL  time.Duration `yaml:"oidc_session_ttl"`
 	} `yaml:"auth"`
 	Core struct {
 		Address string `yaml:"address"` // gRPC address of kranix-core
@@ -56,6 +64,28 @@ type Config struct {
 		RetryInterval time.Duration `yaml:"retry_interval"`
 		Timeout       time.Duration `yaml:"timeout"`
 	} `yaml:"webhooks"`
+	Analytics struct {
+		Enabled   bool          `yaml:"enabled"`
+		Retention time.Duration `yaml:"retention"`
+	} `yaml:"analytics"`
+	OIDCProviders struct {
+		Google struct {
+			Enabled      bool   `yaml:"enabled"`
+			ClientID     string `yaml:"client_id"`
+			ClientSecret string `yaml:"client_secret"`
+		} `yaml:"google"`
+		GitHub struct {
+			Enabled      bool   `yaml:"enabled"`
+			ClientID     string `yaml:"client_id"`
+			ClientSecret string `yaml:"client_secret"`
+		} `yaml:"github"`
+		Okta struct {
+			Enabled      bool   `yaml:"enabled"`
+			Domain       string `yaml:"domain"`
+			ClientID     string `yaml:"client_id"`
+			ClientSecret string `yaml:"client_secret"`
+		} `yaml:"okta"`
+	} `yaml:"oidc_providers"`
 }
 
 func main() {
@@ -71,7 +101,59 @@ func main() {
 	// Initialize logger
 	logger := logging.NewWithLevel("kranix-api", parseLogLevel(config.Logging.Level))
 
-	// Initialize services
+	// Initialize version manager
+	versionManager := version.NewManager()
+	versionManager.InitializeDefaultChangelog()
+
+	// Initialize analytics service
+	var analyticsService *analytics.Service
+	if config.Analytics.Enabled {
+		analyticsConfig := analytics.Config{
+			Retention: config.Analytics.Retention,
+			Enabled:   true,
+		}
+		analyticsService = analytics.NewService(analyticsConfig, logger)
+		log.Println("Analytics service initialized")
+	}
+
+	// Initialize OIDC manager
+	var oidcManager *oidc.Manager
+	if config.Auth.OIDCEnabled {
+		oidcConfig := &auth.OIDCConfig{
+			Providers:     make(map[string]*auth.OIDCProvider),
+			CallbackURL:   config.Auth.OIDCCallbackURL,
+			SessionSecret: "default-secret",
+			SessionTTL:    config.Auth.OIDCSessionTTL,
+		}
+
+		if config.OIDCProviders.Google.Enabled {
+			oidcConfig.Providers["google"] = auth.GetGoogleProvider(
+				config.OIDCProviders.Google.ClientID,
+				config.OIDCProviders.Google.ClientSecret,
+				config.Auth.OIDCCallbackURL,
+			)
+		}
+		if config.OIDCProviders.GitHub.Enabled {
+			oidcConfig.Providers["github"] = auth.GetGitHubProvider(
+				config.OIDCProviders.GitHub.ClientID,
+				config.OIDCProviders.GitHub.ClientSecret,
+				config.Auth.OIDCCallbackURL,
+			)
+		}
+		if config.OIDCProviders.Okta.Enabled {
+			oidcConfig.Providers["okta"] = auth.GetOktaProvider(
+				config.OIDCProviders.Okta.Domain,
+				config.OIDCProviders.Okta.ClientID,
+				config.OIDCProviders.Okta.ClientSecret,
+				config.Auth.OIDCCallbackURL,
+			)
+		}
+
+		oidcManager = oidc.NewManager(oidcConfig, logger)
+		log.Println("OIDC manager initialized")
+	}
+
+	// Initialize webhook service
 	var webhookService *webhooks.Service
 	if config.Webhooks.Enabled {
 		webhookConfig := webhooks.Config{
@@ -100,17 +182,26 @@ func main() {
 
 	// Apply middleware
 	chain := middleware.Chain(
+		versionManager.Middleware,
 		middleware.Logging(config.Logging.Level, config.Logging.Format),
 		middleware.CORS(),
 		middleware.Auth(config.Auth.Mode, config.Auth.JWTSecret, config.Auth.OIDCIssuer),
-		middleware.RateLimit(100), // 100 requests per second
+		middleware.RateLimit(100),
 	)
 
 	// Register handlers
 	handlers.RegisterRoutes(mux)
-
-	// Stream handlers
 	stream.RegisterRoutes(mux)
+
+	// Analytics handlers
+	if analyticsService != nil {
+		analytics.RegisterRoutes(mux, analyticsService)
+	}
+
+	// OIDC handlers
+	if oidcManager != nil {
+		oidc.RegisterRoutes(mux, oidcManager)
+	}
 
 	// Webhook handlers
 	if webhookService != nil {
@@ -119,6 +210,9 @@ func main() {
 
 	// API key handlers
 	apikeys.RegisterRoutes(mux, apiKeyService)
+
+	// Version handlers
+	version.RegisterRoutes(mux, versionManager)
 
 	// GraphQL endpoint
 	if graphqlServer != nil {
@@ -136,8 +230,15 @@ func main() {
 	// Start server in background
 	go func() {
 		log.Printf("Starting API server on port %d", config.API.Port)
+		log.Printf("API Version: %s", config.API.Version)
 		if config.API.GraphQLEnabled {
 			log.Printf("GraphQL endpoint available at %s", config.API.GraphQLPath)
+		}
+		if config.Analytics.Enabled {
+			log.Printf("Analytics API enabled")
+		}
+		if config.Auth.OIDCEnabled {
+			log.Printf("OIDC/SSO login enabled")
 		}
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
@@ -145,7 +246,6 @@ func main() {
 	}()
 
 	// Start gRPC server (placeholder)
-	// TODO: Implement gRPC server
 	log.Printf("gRPC server would start on port %d", config.API.GRPCPort)
 
 	// Setup graceful shutdown

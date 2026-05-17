@@ -5,12 +5,16 @@ api:
   write_timeout: 30s
   graphql_enabled: true            # Enable GraphQL endpoint
   graphql_path: /graphql
+  version: "v1.0.0"
 
 auth:
   mode: jwt                        # jwt | apikey | oidc
   jwt_secret: ""                   # set via KRANE_JWT_SECRET env var
   oidc_issuer: ""
   enable_scopes: true              # Enable fine-grained API key scopes
+  oidc_enabled: false              # Enable OIDC/SSO login
+  oidc_callback_url: "http://localhost:8080/auth/callback"
+  oidc_session_ttl: 24h
 
 core:
   address: "kranix-core:50051"      # gRPC address of kranix-core
@@ -28,3 +32,22 @@ webhooks:
   max_retries: 3
   retry_interval: 30s
   timeout: 10s
+
+analytics:
+  enabled: true
+  retention: 30d                  # How long to retain analytics data
+
+oidc_providers:
+  google:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+  github:
+    enabled: false
+    client_id: ""
+    client_secret: ""
+  okta:
+    enabled: false
+    domain: ""
+    client_id: ""
+    client_secret: ""
