@@ -295,6 +295,19 @@ The OpenAPI 3.0 spec is auto-generated on build and available at:
 
 ---
 
+## Local testing without kranix-core
+
+For unit tests in **kranix-cli**, **kranix-mcp**, **kranix-web**, or third-party clients, run the in-memory mock from [kranix-packages](https://github.com/kranix-io/kranix-packages):
+
+```bash
+cd ../kranix-packages
+go run ./cmd/kranix-mock-api -addr :18080 -skip-auth=true
+```
+
+Point SDKs at `http://localhost:18080`. The mock exposes workloads, namespaces, pod log SSE, and `/api/sse` with the same URL layout as this service (see route table above).
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md). Every new endpoint requires: handler, validation, unit test, and an OpenAPI spec entry. No business logic in handlers — delegate to core.
