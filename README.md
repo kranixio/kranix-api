@@ -11,6 +11,7 @@
 - Exposes a versioned REST API (`/api/v1/...`, `/api/v2/...`) and a gRPC service
 - Handles authentication (API keys, JWT, OIDC)
 - Validates and sanitizes all incoming requests
+- Validates **cron schedules** (standard 5-field expression, optional IANA **`timeZone`**, **`allow`/`forbid`/`replace`** concurrency policy), **GPU** specs, **cross-namespace traffic** namespace names, and **`scheduling.workloadPriority`** (**`critical`** | **`high`** | **`normal`** | **`low`**) via `internal/validation` (spot / preemption flags are passed through to core and runtime)
 - Translates HTTP/gRPC requests into `kranix-core` operations
 - Streams logs and events back to callers over SSE / gRPC streams
 - Emits audit logs for every mutating action
@@ -248,6 +249,14 @@ The API enforces rate limiting per client (based on API key or IP address) and p
 - Set resource limits per namespace (max workloads, CPU, memory, storage)
 - Quota usage tracked in real-time
 - Quota enforcement prevents resource exhaustion
+
+**Note:** Aggregate **hard limits** keyed by Kubernetes namespace or by team (`kranix.io/team`) are enforced in **`kranix-core`** when `resource_quota.hard_limits` is configured there. This API validates workload shape (including **cron**) and forwards intent to core; it does not re-implement aggregate quota sums.
+
+---
+
+## GraphQL (workload cron types)
+
+The embedded schema in `internal/graphql/graphql.go` includes **`CronScheduleSpec`**, **`CronScheduleStatus`**, and matching **input** types on **`WorkloadSpec`** / **`WorkloadSpecInput`** so typed clients can submit and read cron fields alongside the REST JSON model in `kranix-packages/types`.
 
 ---
 

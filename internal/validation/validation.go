@@ -3,9 +3,11 @@ package validation
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/kranix-io/kranix-packages/errors"
 	"github.com/kranix-io/kranix-packages/types"
+	"github.com/robfig/cron/v3"
 )
 
 // ValidateWorkloadSpec validates a workload specification.
@@ -37,6 +39,28 @@ func ValidateWorkloadSpec(spec *types.WorkloadSpec) error {
 		case "critical", "high", "normal", "low":
 		default:
 			return errors.Wrap(errors.ErrInvalidSpec, "scheduling.workloadPriority must be critical|high|normal|low")
+		}
+	}
+
+	if spec.CronSchedule != nil && !spec.CronSchedule.Suspended {
+		schedule := strings.TrimSpace(spec.CronSchedule.Schedule)
+		if schedule == "" {
+			return errors.Wrap(errors.ErrInvalidSpec, "cronSchedule.schedule is required when cron is enabled")
+		}
+		if _, err := cron.ParseStandard(schedule); err != nil {
+			return errors.Wrap(errors.ErrInvalidSpec, "invalid cronSchedule.schedule (use standard 5-field cron)")
+		}
+		if tz := strings.TrimSpace(spec.CronSchedule.TimeZone); tz != "" {
+			if _, err := time.LoadLocation(tz); err != nil {
+				return errors.Wrap(errors.ErrInvalidSpec, "invalid cronSchedule.timeZone")
+			}
+		}
+		if cp := strings.ToLower(strings.TrimSpace(spec.CronSchedule.ConcurrencyPolicy)); cp != "" {
+			switch cp {
+			case "allow", "forbid", "replace":
+			default:
+				return errors.Wrap(errors.ErrInvalidSpec, "cronSchedule.concurrencyPolicy must be allow|forbid|replace")
+			}
 		}
 	}
 

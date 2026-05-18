@@ -144,6 +144,18 @@ type WorkloadSpec {
   ports: [PortSpec!]!
   backend: String!
   composeFile: String
+  cronSchedule: CronScheduleSpec
+}
+
+type CronScheduleSpec {
+  schedule: String!
+  suspended: Boolean
+  timeZone: String
+  concurrencyPolicy: String
+}
+
+type CronScheduleStatus {
+  lastScheduleTime: Time
 }
 
 type WorkloadStatus {
@@ -160,6 +172,7 @@ type WorkloadStatus {
   readyReplicas: Int!
   message: String
   lastUpdated: Time!
+  cron: CronScheduleStatus
 }
 
 enum WorkloadPhase {
@@ -250,6 +263,14 @@ input WorkloadSpecInput {
   ports: [PortSpecInput!]!
   backend: String!
   composeFile: String
+  cronSchedule: CronScheduleSpecInput
+}
+
+input CronScheduleSpecInput {
+  schedule: String!
+  suspended: Boolean
+  timeZone: String
+  concurrencyPolicy: String
 }
 
 input ResourceSpecInput {
