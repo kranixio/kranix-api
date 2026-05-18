@@ -304,7 +304,7 @@ cd ../kranix-packages
 go run ./cmd/kranix-mock-api -addr :18080 -skip-auth=true
 ```
 
-Point SDKs at `http://localhost:18080`. The mock exposes workloads, namespaces, pod log SSE, and `/api/sse` with the same URL layout as this service (see route table above).
+Point **`kranix-mock-api`** at the same address for workloads, namespaces, incident runbooks, and basic latency analytics — see [kranix-examples](https://github.com/kranix-io/kranix-examples) (`observability/ai-oncall-pagerduty`, `reference-architectures/ml-inference-platform`, `platform-engineering/self-service-deploy`).
 
 ---
 
