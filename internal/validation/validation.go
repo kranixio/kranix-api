@@ -32,6 +32,14 @@ func ValidateWorkloadSpec(spec *types.WorkloadSpec) error {
 		return errors.Wrap(errors.ErrInvalidSpec, "invalid image format")
 	}
 
+	if spec.Scheduling != nil && spec.Scheduling.WorkloadPriority != "" {
+		switch strings.ToLower(strings.TrimSpace(spec.Scheduling.WorkloadPriority)) {
+		case "critical", "high", "normal", "low":
+		default:
+			return errors.Wrap(errors.ErrInvalidSpec, "scheduling.workloadPriority must be critical|high|normal|low")
+		}
+	}
+
 	return nil
 }
 

@@ -30,6 +30,16 @@ type WorkloadSpec {
   scheduling: SchedulingConfig
   dependencies: [Dependency!]!
   failurePrediction: FailurePrediction
+  crossNamespaceTraffic: CrossNamespaceTrafficPolicy
+}
+
+type CrossNamespaceTrafficPolicy {
+  enabled: Boolean!
+  allowedIngressNamespaces: [String!]!
+  allowedEgressNamespaces: [String!]!
+  allowSameNamespace: Boolean
+  blockClusterDNS: Boolean
+  allowEgressInternet: Boolean
 }
 
 type WorkloadStatus {
@@ -109,6 +119,15 @@ type SchedulingConfig {
   affinity: AffinityConfig
   tolerations: [Toleration!]!
   maxCostPerHour: String
+  workloadPriority: String
+  preemptionEnabled: Boolean
+  priorityClassName: String
+  spot: SpotWorkloadConfig
+}
+
+type SpotWorkloadConfig {
+  enabled: Boolean
+  rescheduleOnNodeTermination: Boolean
 }
 
 type AffinityConfig {
@@ -315,6 +334,16 @@ input WorkloadSpecInput {
   scheduling: SchedulingConfigInput
   dependencies: [DependencyInput!]!
   failurePrediction: FailurePredictionInput
+  crossNamespaceTraffic: CrossNamespaceTrafficPolicyInput
+}
+
+input CrossNamespaceTrafficPolicyInput {
+  enabled: Boolean!
+  allowedIngressNamespaces: [String!]!
+  allowedEgressNamespaces: [String!]!
+  allowSameNamespace: Boolean
+  blockClusterDNS: Boolean
+  allowEgressInternet: Boolean
 }
 
 input ResourceSpecInput {
@@ -370,6 +399,15 @@ input SchedulingConfigInput {
   affinity: AffinityConfigInput
   tolerations: [TolerationInput!]!
   maxCostPerHour: String
+  workloadPriority: String
+  preemptionEnabled: Boolean
+  priorityClassName: String
+  spot: SpotWorkloadConfigInput
+}
+
+input SpotWorkloadConfigInput {
+  enabled: Boolean
+  rescheduleOnNodeTermination: Boolean
 }
 
 input AffinityConfigInput {
