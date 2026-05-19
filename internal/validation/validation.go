@@ -54,6 +54,11 @@ func ValidateWorkloadSpec(spec *types.WorkloadSpec) error {
 			return errors.Wrap(errors.ErrInvalidSpec, "warmStandby.replicas must be non-negative")
 		}
 	}
+	if spec.SecretRotation != nil && spec.SecretRotation.Enabled {
+		if len(spec.SecretRotation.SecretRefs) == 0 {
+			return errors.Wrap(errors.ErrInvalidSpec, "secretRotation.secretRefs required when enabled")
+		}
+	}
 
 	if spec.CronSchedule != nil && !spec.CronSchedule.Suspended {
 		schedule := strings.TrimSpace(spec.CronSchedule.Schedule)

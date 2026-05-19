@@ -4,97 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/kranix-io/kranix-api/internal/validation"
 	"github.com/kranix-io/kranix-packages/types"
 )
 
-// RegisterRoutes registers all HTTP handlers.
-func RegisterRoutes(mux *http.ServeMux) {
-	// Workloads
-	mux.HandleFunc("POST /api/v1/workloads", handleDeployWorkload)
-	mux.HandleFunc("GET /api/v1/workloads", handleListWorkloads)
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkload)
-	mux.HandleFunc("PATCH /api/v1/workloads/", handleUpdateWorkload)
-	mux.HandleFunc("DELETE /api/v1/workloads/", handleDeleteWorkload)
-	mux.HandleFunc("POST /api/v1/workloads/", handleRestartWorkload)
-
-	// Pods
-	mux.HandleFunc("GET /api/v1/workloads/", handleListPods)
-	mux.HandleFunc("GET /api/v1/pods/", handleGetPodLogs)
-	mux.HandleFunc("GET /api/v1/pods/", handleExecPod)
-
-	// Namespaces
-	mux.HandleFunc("POST /api/v1/namespaces", handleCreateNamespace)
-	mux.HandleFunc("GET /api/v1/namespaces", handleListNamespaces)
-	mux.HandleFunc("DELETE /api/v1/namespaces/", handleDeleteNamespace)
-
-	// Event Sourcing - Event History
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkloadEvents)
-	mux.HandleFunc("GET /api/v1/events/", handleGetEvent)
-
-	// Drift Detection
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetDriftReports)
-
-	// Health Gate
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetHealthGateStatus)
-	mux.HandleFunc("POST /api/v1/workloads/", handleEvaluateHealthGate)
-
-	// Optional Enhancement Endpoints
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetScalingHistory)
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetRolloutStatus)
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetDependencies)
-	mux.HandleFunc("GET /api/v1/tenants/", handleGetTenantQuota)
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetPredictions)
-
-	// Analysis
-	mux.HandleFunc("GET /api/v1/workloads/", handleAnalyzeWorkload)
-	mux.HandleFunc("POST /api/v1/manifests/generate", handleGenerateManifests)
-
-	// AI Assistant
-	mux.HandleFunc("POST /api/v1/ai/ask", handleAIAsk)
-
-	// Diff
-	mux.HandleFunc("POST /api/v1/workloads/", handleDiffWorkload)
-
-	// Cost
-	mux.HandleFunc("GET /api/v1/workloads/", handleGetWorkloadCost)
-	mux.HandleFunc("GET /api/v1/cost/summary", handleGetCostSummary)
-
-	// Pods
-	mux.HandleFunc("GET /api/v1/workloads/", handleListPods)
-
-	// Templates
-	mux.HandleFunc("GET /api/v1/templates", handleListTemplates)
-	mux.HandleFunc("POST /api/v1/templates/get", handleGetTemplate)
-
-	// Multi-Agent Coordination
-	mux.HandleFunc("POST /api/v1/coordination/tasks", handleCreateTask)
-	mux.HandleFunc("GET /api/v1/coordination/tasks", handleListTasks)
-	mux.HandleFunc("GET /api/v1/coordination/tasks/", handleGetTask)
-	mux.HandleFunc("PATCH /api/v1/coordination/tasks/", handleUpdateTaskStatus)
-	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleDelegateTask)
-	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleClaimTask)
-	mux.HandleFunc("POST /api/v1/coordination/tasks/", handleCreateSubtask)
-
-	// Dry-Run Mode
-	mux.HandleFunc("POST /api/v1/dryrun/mode", handleSetDryRunMode)
-	mux.HandleFunc("GET /api/v1/dryrun/mode", handleGetDryRunMode)
-	mux.HandleFunc("GET /api/v1/dryrun/preview", handleGetDryRunPreview)
-	mux.HandleFunc("DELETE /api/v1/dryrun/actions", handleClearDryRunActions)
-
-	// Incident Response
-	mux.HandleFunc("GET /api/v1/incident/runbooks", handleListRunbooks)
-	mux.HandleFunc("GET /api/v1/incident/runbooks/", handleGetRunbook)
-	mux.HandleFunc("POST /api/v1/incident/runbooks", handleCreateRunbook)
-	mux.HandleFunc("POST /api/v1/incident/runbooks/", handleExecuteRunbook)
-	mux.HandleFunc("GET /api/v1/incident/executions", handleListExecutions)
-	mux.HandleFunc("GET /api/v1/incident/executions/", handleGetExecution)
-	mux.HandleFunc("DELETE /api/v1/incident/executions/", handleCancelExecution)
-}
-
 // handleDeployWorkload handles workload deployment requests.
-func handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 	var spec types.WorkloadSpec
 	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -107,17 +24,26 @@ func handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Delegate to kranix-core via gRPC
-	// For now, return a placeholder response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Workload deployment not yet implemented",
-	})
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		id = spec.Name
+	}
+	if s.Core != nil && s.Core.Enabled() {
+		if err := s.Core.DeployWorkload(r.Context(), id, spec); err != nil {
+			s.recordAudit(r, "workload.deploy", "workload", id, "error", err.Error(), nil)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		s.recordAudit(r, "workload.deploy", "workload", id, "success", "", nil)
+		writeJSON(w, http.StatusCreated, map[string]string{"id": id, "status": "deployed"})
+		return
+	}
+	s.recordAudit(r, "workload.deploy", "workload", id, "success", "", map[string]interface{}{"mode": "local"})
+	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "message": "deploy accepted (core not configured)"})
 }
 
 // handleListWorkloads handles listing workloads.
-func handleListWorkloads(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListWorkloads(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
 
 	// TODO: Delegate to kranix-core via gRPC
@@ -130,7 +56,7 @@ func handleListWorkloads(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetWorkload handles getting a single workload.
-func handleGetWorkload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetWorkload(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	// URL pattern: /api/v1/workloads/{id}
 	// TODO: Implement proper path parameter extraction
@@ -143,7 +69,7 @@ func handleGetWorkload(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateWorkload handles updating a workload.
-func handleUpdateWorkload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateWorkload(w http.ResponseWriter, r *http.Request) {
 	var spec types.WorkloadSpec
 	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -158,22 +84,49 @@ func handleUpdateWorkload(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteWorkload handles deleting a workload.
-func handleDeleteWorkload(w http.ResponseWriter, r *http.Request) {
-	// TODO: Delegate to kranix-core via gRPC
+func (s *Server) handleDeleteWorkload(w http.ResponseWriter, r *http.Request) {
+	id := extractID(r.URL.Path)
+	if id == "" {
+		http.Error(w, "workload id required", http.StatusBadRequest)
+		return
+	}
+	if s.Core != nil && s.Core.Enabled() {
+		if err := s.Core.DeleteWorkload(r.Context(), id); err != nil {
+			s.recordAudit(r, "workload.delete", "workload", id, "error", err.Error(), nil)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+	s.recordAudit(r, "workload.delete", "workload", id, "success", "", nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleRestartWorkload handles restarting a workload.
-func handleRestartWorkload(w http.ResponseWriter, r *http.Request) {
-	// TODO: Delegate to kranix-core via gRPC
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Not yet implemented",
-	})
+func (s *Server) handleRestartWorkload(w http.ResponseWriter, r *http.Request) {
+	id := extractWorkloadIDFromPath(r.URL.Path, "restart")
+	if id == "" {
+		id = extractID(r.URL.Path)
+	}
+	if id == "" {
+		http.Error(w, "workload id required", http.StatusBadRequest)
+		return
+	}
+	if s.Core != nil && s.Core.Enabled() {
+		if err := s.Core.RestartWorkload(r.Context(), id); err != nil {
+			s.recordAudit(r, "workload.restart", "workload", id, "error", err.Error(), nil)
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		s.recordAudit(r, "workload.restart", "workload", id, "success", "", nil)
+		writeJSON(w, http.StatusOK, map[string]string{"id": id, "status": "restarted"})
+		return
+	}
+	s.recordAudit(r, "workload.restart", "workload", id, "success", "", map[string]interface{}{"mode": "local"})
+	writeJSON(w, http.StatusOK, map[string]string{"id": id, "message": "restart accepted (core not configured)"})
 }
 
 // handleListPods handles listing pods for a workload.
-func handleListPods(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListPods(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -183,7 +136,7 @@ func handleListPods(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetPodLogs handles streaming pod logs (SSE).
-func handleGetPodLogs(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetPodLogs(w http.ResponseWriter, r *http.Request) {
 	// TODO: Implement SSE streaming
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -192,7 +145,7 @@ func handleGetPodLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleExecPod handles exec into a pod (WebSocket).
-func handleExecPod(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExecPod(w http.ResponseWriter, r *http.Request) {
 	// TODO: Implement WebSocket
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -201,7 +154,7 @@ func handleExecPod(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateNamespace handles creating a namespace.
-func handleCreateNamespace(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateNamespace(w http.ResponseWriter, r *http.Request) {
 	var namespace types.Namespace
 	if err := json.NewDecoder(r.Body).Decode(&namespace); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -217,7 +170,7 @@ func handleCreateNamespace(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListNamespaces handles listing namespaces.
-func handleListNamespaces(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListNamespaces(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -227,13 +180,13 @@ func handleListNamespaces(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDeleteNamespace handles deleting a namespace.
-func handleDeleteNamespace(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeleteNamespace(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleAnalyzeWorkload handles AI-powered failure analysis.
-func handleAnalyzeWorkload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAnalyzeWorkload(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -242,7 +195,7 @@ func handleAnalyzeWorkload(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGenerateManifests handles generating K8s manifests from intent.
-func handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -251,7 +204,7 @@ func handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAIAsk handles AI assistant queries.
-func handleAIAsk(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -273,7 +226,7 @@ func handleAIAsk(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDiffWorkload handles workload diff requests.
-func handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
 	// Extract workload name from URL path
 	// URL pattern: /api/v1/workloads/{name}/diff
 	workloadName := extractID(r.URL.Path)
@@ -307,7 +260,7 @@ func handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetWorkloadCost handles getting cost breakdown for a workload.
-func handleGetWorkloadCost(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetWorkloadCost(w http.ResponseWriter, r *http.Request) {
 	// Extract workload name from URL path
 	workloadName := extractID(r.URL.Path)
 	namespace := r.URL.Query().Get("namespace")
@@ -340,7 +293,7 @@ func handleGetWorkloadCost(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetCostSummary handles getting cost summary for a namespace.
-func handleGetCostSummary(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetCostSummary(w http.ResponseWriter, r *http.Request) {
 	namespace := r.URL.Query().Get("namespace")
 	duration := r.URL.Query().Get("duration")
 
@@ -367,7 +320,7 @@ func handleGetCostSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListTemplates handles listing available templates.
-func handleListTemplates(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core or template service
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -423,7 +376,7 @@ func handleListTemplates(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetTemplate handles getting a specific template with variables.
-func handleGetTemplate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetTemplate(w http.ResponseWriter, r *http.Request) {
 	var req map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -443,31 +396,38 @@ func handleGetTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetWorkloadEvents handles retrieving event history for a workload.
-func handleGetWorkloadEvents(w http.ResponseWriter, r *http.Request) {
-	// Extract workload ID from URL path
-	workloadID := extractID(r.URL.Path)
+func (s *Server) handleGetWorkloadEvents(w http.ResponseWriter, r *http.Request) {
+	workloadID := extractWorkloadIDFromPath(r.URL.Path, "events")
+	if workloadID == "" {
+		workloadID = extractID(r.URL.Path)
+	}
 	if workloadID == "" {
 		http.Error(w, "Invalid workload ID", http.StatusBadRequest)
 		return
 	}
-
-	// Query parameters
-	fromVersion := r.URL.Query().Get("from_version")
-	limit := r.URL.Query().Get("limit")
-
-	// TODO: Delegate to kranix-core via gRPC to query event sourcing store
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"workload_id":  workloadID,
-		"from_version": fromVersion,
-		"limit":        limit,
-		"events":       []map[string]interface{}{},
-		"message":      "Event history query not yet implemented - requires kranix-core integration",
+	fromVersion, _ := strconv.ParseInt(r.URL.Query().Get("from_version"), 10, 64)
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if s.Core != nil && s.Core.Enabled() {
+		events, err := s.Core.GetWorkloadEvents(r.Context(), workloadID, fromVersion, limit)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"workload_id": workloadID,
+			"events":      events,
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"workload_id": workloadID,
+		"events":      []interface{}{},
+		"entries":     s.auditEntriesFor(workloadID),
 	})
 }
 
 // handleGetEvent handles retrieving a single event by ID.
-func handleGetEvent(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 	// Extract event ID from URL path
 	eventID := extractID(r.URL.Path)
 	if eventID == "" {
@@ -484,7 +444,7 @@ func handleGetEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetDriftReports handles retrieving drift detection reports for a workload.
-func handleGetDriftReports(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDriftReports(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -502,7 +462,7 @@ func handleGetDriftReports(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetScalingHistory handles retrieving scaling history for a workload.
-func handleGetScalingHistory(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetScalingHistory(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -520,7 +480,7 @@ func handleGetScalingHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetRolloutStatus handles retrieving rollout status for a workload.
-func handleGetRolloutStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetRolloutStatus(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -542,7 +502,7 @@ func handleGetRolloutStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetDependencies handles retrieving dependency status for a workload.
-func handleGetDependencies(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDependencies(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -560,7 +520,7 @@ func handleGetDependencies(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetTenantQuota handles retrieving tenant quota usage.
-func handleGetTenantQuota(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetTenantQuota(w http.ResponseWriter, r *http.Request) {
 	// Extract tenant ID from URL path
 	tenantID := extractID(r.URL.Path)
 	if tenantID == "" {
@@ -585,7 +545,7 @@ func handleGetTenantQuota(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetPredictions handles retrieving failure predictions for a workload.
-func handleGetPredictions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetPredictions(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -607,7 +567,7 @@ func handleGetPredictions(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetHealthGateStatus handles retrieving health gate status for a workload.
-func handleGetHealthGateStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetHealthGateStatus(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -627,7 +587,7 @@ func handleGetHealthGateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleEvaluateHealthGate handles evaluating health gates for a workload.
-func handleEvaluateHealthGate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleEvaluateHealthGate(w http.ResponseWriter, r *http.Request) {
 	// Extract workload ID from URL path
 	workloadID := extractID(r.URL.Path)
 	if workloadID == "" {
@@ -676,7 +636,7 @@ func splitPath(path string) []string {
 // Multi-Agent Coordination Handlers
 
 // handleCreateTask handles creating a new coordination task.
-func handleCreateTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	var task map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -693,7 +653,7 @@ func handleCreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListTasks handles listing coordination tasks.
-func handleListTasks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListTasks(w http.ResponseWriter, r *http.Request) {
 	agentID := r.URL.Query().Get("agent_id")
 	status := r.URL.Query().Get("status")
 
@@ -708,7 +668,7 @@ func handleListTasks(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetTask handles getting a specific task.
-func handleGetTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	taskID := extractID(r.URL.Path)
 
 	// TODO: Delegate to kranix-core via gRPC
@@ -720,7 +680,7 @@ func handleGetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUpdateTaskStatus handles updating task status.
-func handleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 	taskID := extractID(r.URL.Path)
 	var update map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
@@ -738,7 +698,7 @@ func handleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleDelegateTask handles delegating a task to another agent.
-func handleDelegateTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDelegateTask(w http.ResponseWriter, r *http.Request) {
 	taskID := extractID(r.URL.Path)
 	var delegation map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&delegation); err != nil {
@@ -756,7 +716,7 @@ func handleDelegateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleClaimTask handles claiming a pending task.
-func handleClaimTask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleClaimTask(w http.ResponseWriter, r *http.Request) {
 	taskID := extractID(r.URL.Path)
 	var claim map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&claim); err != nil {
@@ -774,7 +734,7 @@ func handleClaimTask(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateSubtask handles creating a sub-task.
-func handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 	taskID := extractID(r.URL.Path)
 	var subtask map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&subtask); err != nil {
@@ -794,7 +754,7 @@ func handleCreateSubtask(w http.ResponseWriter, r *http.Request) {
 // Dry-Run Mode Handlers
 
 // handleSetDryRunMode handles setting the dry-run mode.
-func handleSetDryRunMode(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSetDryRunMode(w http.ResponseWriter, r *http.Request) {
 	var modeReq map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&modeReq); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -810,7 +770,7 @@ func handleSetDryRunMode(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetDryRunMode handles getting the current dry-run mode.
-func handleGetDryRunMode(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDryRunMode(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -820,7 +780,7 @@ func handleGetDryRunMode(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetDryRunPreview handles getting dry-run preview.
-func handleGetDryRunPreview(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetDryRunPreview(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -830,7 +790,7 @@ func handleGetDryRunPreview(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleClearDryRunActions handles clearing dry-run actions.
-func handleClearDryRunActions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleClearDryRunActions(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core via gRPC
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -841,7 +801,7 @@ func handleClearDryRunActions(w http.ResponseWriter, r *http.Request) {
 // Incident Response Handlers
 
 // handleListRunbooks handles listing incident runbooks.
-func handleListRunbooks(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListRunbooks(w http.ResponseWriter, r *http.Request) {
 	category := r.URL.Query().Get("category")
 
 	// TODO: Delegate to kranix-core via gRPC
@@ -854,7 +814,7 @@ func handleListRunbooks(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetRunbook handles getting a specific runbook.
-func handleGetRunbook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetRunbook(w http.ResponseWriter, r *http.Request) {
 	runbookID := extractID(r.URL.Path)
 
 	// TODO: Delegate to kranix-core via gRPC
@@ -866,7 +826,7 @@ func handleGetRunbook(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCreateRunbook handles creating a new runbook.
-func handleCreateRunbook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateRunbook(w http.ResponseWriter, r *http.Request) {
 	var runbook map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&runbook); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -883,7 +843,7 @@ func handleCreateRunbook(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleExecuteRunbook handles executing a runbook.
-func handleExecuteRunbook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleExecuteRunbook(w http.ResponseWriter, r *http.Request) {
 	runbookID := extractID(r.URL.Path)
 	var executionReq map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&executionReq); err != nil {
@@ -902,7 +862,7 @@ func handleExecuteRunbook(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListExecutions handles listing runbook executions.
-func handleListExecutions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListExecutions(w http.ResponseWriter, r *http.Request) {
 	runbookID := r.URL.Query().Get("runbook_id")
 	status := r.URL.Query().Get("status")
 
@@ -917,7 +877,7 @@ func handleListExecutions(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetExecution handles getting a specific execution.
-func handleGetExecution(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleGetExecution(w http.ResponseWriter, r *http.Request) {
 	executionID := extractID(r.URL.Path)
 
 	// TODO: Delegate to kranix-core via gRPC
@@ -929,7 +889,7 @@ func handleGetExecution(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleCancelExecution handles canceling a running execution.
-func handleCancelExecution(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCancelExecution(w http.ResponseWriter, r *http.Request) {
 	executionID := extractID(r.URL.Path)
 
 	// TODO: Delegate to kranix-core via gRPC

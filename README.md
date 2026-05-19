@@ -223,6 +223,26 @@ audit:
 
 ---
 
+## Bulk operations
+
+`POST /api/v1/workloads/bulk` runs **deploy**, **restart**, or **delete** for many workloads in one request. Set `continueOnError` to keep processing after individual failures. When `core.http_base_url` points at kranix-core, the API forwards the batch to core.
+
+```json
+{
+  "operation": "restart",
+  "continueOnError": true,
+  "workloads": [{ "id": "app-a" }, { "id": "app-b" }]
+}
+```
+
+## Audit trail
+
+- `GET /api/v1/audit` — filter API audit entries (`resource_type`, `resource_id`, `action`, `actor`, `since`, `limit`)
+- `GET /api/v1/audit/{entryId}` — single API audit record
+- `GET /api/v1/audit/resources/{type}/{id}` — merges API audit entries with **kranix-core** domain events (event sourcing) for full resource history
+
+Enable with `audit.enabled` in config; entries are written for deploy, restart, delete, and bulk operations.
+
 ## Connectivity
 
 | Repo | Relationship |

@@ -17,7 +17,8 @@ auth:
   oidc_session_ttl: 24h
 
 core:
-  address: "kranix-core:50051"      # gRPC address of kranix-core
+  address: "kranix-core:50051"      # reserved for future gRPC
+  http_base_url: "http://localhost:8081"
 
 logging:
   level: info

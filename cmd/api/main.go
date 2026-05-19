@@ -14,6 +14,8 @@ import (
 
 	"github.com/kranix-io/kranix-api/internal/analytics"
 	"github.com/kranix-io/kranix-api/internal/apikeys"
+	"github.com/kranix-io/kranix-api/internal/audit"
+	"github.com/kranix-io/kranix-api/internal/coreclient"
 	"github.com/kranix-io/kranix-api/internal/graphql"
 	"github.com/kranix-io/kranix-api/internal/handlers"
 	"github.com/kranix-io/kranix-api/internal/middleware"
@@ -48,7 +50,8 @@ type Config struct {
 		OIDCSessionTTL  time.Duration `yaml:"oidc_session_ttl"`
 	} `yaml:"auth"`
 	Core struct {
-		Address string `yaml:"address"` // gRPC address of kranix-core
+		Address    string `yaml:"address"`     // legacy gRPC address (reserved)
+		HTTPBaseURL string `yaml:"http_base_url"` // REST base URL of kranix-core, e.g. http://localhost:8081
 	} `yaml:"core"`
 	Logging struct {
 		Level  string `yaml:"level"`  // debug, info, warn, error
@@ -189,8 +192,16 @@ func main() {
 		middleware.RateLimit(100),
 	)
 
-	// Register handlers
-	handlers.RegisterRoutes(mux)
+	coreHTTP := config.Core.HTTPBaseURL
+	if coreHTTP == "" {
+		coreHTTP = "http://localhost:8081"
+	}
+	auditLogger := audit.New(audit.Config{
+		Enabled: config.Audit.Enabled,
+		Sink:    config.Audit.Sink,
+	})
+	handlerServer := handlers.NewServer(coreclient.New(coreHTTP), auditLogger)
+	handlerServer.RegisterRoutes(mux)
 	stream.RegisterRoutes(mux)
 
 	// Analytics handlers
