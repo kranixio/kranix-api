@@ -128,7 +128,9 @@ func (c *Client) ListWorkloads(ctx context.Context, q types.WorkloadSearchQuery,
 	if cursor != "" {
 		params.Set("cursor", cursor)
 	}
-	if q.Namespace != "" {
+	if q.AllNamespaces {
+		params.Set("all_namespaces", "true")
+	} else if q.Namespace != "" {
 		params.Set("namespace", q.Namespace)
 	}
 	if q.Phase != "" {

@@ -26,6 +26,11 @@ func (s *Server) handleCreateChangelogSubscription(w http.ResponseWriter, r *htt
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+	if s.ifDryRun(w, r, "changelog.subscribe", "changelog_subscription", sub.Email, map[string]interface{}{
+		"subscription": sub,
+	}) {
+		return
+	}
 	created, err := s.ChangelogNotify.Subscribe(&sub)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -39,6 +44,9 @@ func (s *Server) handleDeleteChangelogSubscription(w http.ResponseWriter, r *htt
 	id := r.PathValue("id")
 	if s.ChangelogNotify == nil {
 		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if s.ifDryRun(w, r, "changelog.unsubscribe", "changelog_subscription", id, map[string]interface{}{"id": id}) {
 		return
 	}
 	if !s.ChangelogNotify.Unsubscribe(id) {
@@ -61,6 +69,13 @@ func (s *Server) handlePublishChangelogRelease(w http.ResponseWriter, r *http.Re
 	}
 	if req.Version == "" {
 		http.Error(w, "version is required", http.StatusBadRequest)
+		return
+	}
+	if s.ifDryRun(w, r, "changelog.publish", "api_version", req.Version, map[string]interface{}{
+		"version": req.Version,
+		"entries": len(req.Entries),
+		"notify":  req.Notify,
+	}) {
 		return
 	}
 	notify := req.Notify

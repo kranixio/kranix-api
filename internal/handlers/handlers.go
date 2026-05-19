@@ -28,6 +28,12 @@ func (s *Server) handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		id = spec.Name
 	}
+	if s.ifDryRun(w, r, "workload.deploy", "workload", id, map[string]interface{}{
+		"id":   id,
+		"spec": specToMap(spec),
+	}) {
+		return
+	}
 	if s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.DeployWorkload(r.Context(), id, spec); err != nil {
 			s.recordAudit(r, "workload.deploy", "workload", id, "error", err.Error(), nil)
@@ -103,6 +109,9 @@ func (s *Server) handleDeleteWorkload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "workload id required", http.StatusBadRequest)
 		return
 	}
+	if s.ifDryRun(w, r, "workload.delete", "workload", id, map[string]interface{}{"id": id}) {
+		return
+	}
 	if s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.DeleteWorkload(r.Context(), id); err != nil {
 			s.recordAudit(r, "workload.delete", "workload", id, "error", err.Error(), nil)
@@ -122,6 +131,9 @@ func (s *Server) handleRestartWorkload(w http.ResponseWriter, r *http.Request) {
 	}
 	if id == "" {
 		http.Error(w, "workload id required", http.StatusBadRequest)
+		return
+	}
+	if s.ifDryRun(w, r, "workload.restart", "workload", id, map[string]interface{}{"id": id}) {
 		return
 	}
 	if s.Core != nil && s.Core.Enabled() {

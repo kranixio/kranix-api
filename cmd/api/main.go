@@ -200,7 +200,7 @@ func main() {
 		versionManager.Middleware,
 		middleware.Logging(config.Logging.Level, config.Logging.Format),
 		middleware.CORS(),
-		middleware.Auth(config.Auth.Mode, config.Auth.JWTSecret, config.Auth.OIDCIssuer),
+		middleware.Auth(config.Auth.Mode, config.Auth.JWTSecret, config.Auth.OIDCIssuer, apiKeyService),
 		middleware.RateLimit(100),
 	)
 

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"sync"
@@ -11,6 +12,11 @@ import (
 	"github.com/kranix-io/kranix-packages/auth"
 	"github.com/kranix-io/kranix-packages/logging"
 )
+
+// APIKeyLookup resolves API keys by bearer token value.
+type APIKeyLookup interface {
+	GetAPIKeyByKey(key string) (*auth.APIKey, error)
+}
 
 // Chain creates a middleware chain.
 func Chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) http.Handler {
@@ -53,7 +59,7 @@ func CORS() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Dry-Run")
 
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
@@ -65,8 +71,9 @@ func CORS() func(http.Handler) http.Handler {
 	}
 }
 
-// Auth validates authentication tokens.
-func Auth(mode, jwtSecret, oidcIssuer string) func(http.Handler) http.Handler {
+// Auth validates authentication tokens. When lookup is non-nil and mode is apikey,
+// keys are resolved from the store and optional IP allowlists are enforced.
+func Auth(mode, jwtSecret, oidcIssuer string, lookup APIKeyLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip auth for health checks and docs
@@ -83,43 +90,71 @@ func Auth(mode, jwtSecret, oidcIssuer string) func(http.Handler) http.Handler {
 
 			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-			// Validate based on mode
-			var token *auth.Token
 			switch mode {
 			case "apikey":
 				if !strings.HasPrefix(tokenStr, "krane_") {
 					http.Error(w, "Invalid API key format", http.StatusUnauthorized)
 					return
 				}
-				token = &auth.Token{
-					Type:  auth.TokenTypeAPIKey,
-					Value: tokenStr,
+				if lookup != nil {
+					apiKey, err := lookup.GetAPIKeyByKey(tokenStr)
+					if err != nil {
+						http.Error(w, "Invalid API key", http.StatusUnauthorized)
+						return
+					}
+					if apiKey.Revoked {
+						http.Error(w, "API key revoked", http.StatusUnauthorized)
+						return
+					}
+					if !apiKey.ExpiresAt.IsZero() && time.Now().After(apiKey.ExpiresAt) {
+						http.Error(w, "API key expired", http.StatusUnauthorized)
+						return
+					}
+					clientIP := requestClientIP(r)
+					if !auth.IPAllowed(clientIP, apiKey.AllowedIPs) {
+						http.Error(w, "Client IP not allowed for this API key", http.StatusForbidden)
+						return
+					}
+					ctx := context.WithValue(r.Context(), "apiKey", apiKey)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+				token := &auth.Token{Type: auth.TokenTypeAPIKey, Value: tokenStr}
+				if err := auth.ValidateToken(token); err != nil {
+					http.Error(w, err.Error(), http.StatusUnauthorized)
+					return
 				}
 			case "jwt":
-				// TODO: Implement JWT validation
-				token = &auth.Token{
-					Type:  auth.TokenTypeJWT,
-					Value: tokenStr,
+				token := &auth.Token{Type: auth.TokenTypeJWT, Value: tokenStr}
+				if err := auth.ValidateToken(token); err != nil {
+					http.Error(w, err.Error(), http.StatusUnauthorized)
+					return
 				}
 			case "oidc":
-				// TODO: Implement OIDC validation
-				token = &auth.Token{
-					Type:  auth.TokenTypeJWT,
-					Value: tokenStr,
+				token := &auth.Token{Type: auth.TokenTypeJWT, Value: tokenStr}
+				if err := auth.ValidateToken(token); err != nil {
+					http.Error(w, err.Error(), http.StatusUnauthorized)
+					return
 				}
 			default:
 				http.Error(w, "Invalid auth mode", http.StatusInternalServerError)
 				return
 			}
 
-			if err := auth.ValidateToken(token); err != nil {
-				http.Error(w, err.Error(), http.StatusUnauthorized)
-				return
-			}
-
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func requestClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return auth.ClientIP(strings.TrimSpace(parts[0]))
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return auth.ClientIP(xri)
+	}
+	return auth.ClientIP(r.RemoteAddr)
 }
 
 // RequirePermission enforces fine-grained API key scope permissions.

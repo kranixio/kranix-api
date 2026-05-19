@@ -41,6 +41,12 @@ func (s *Server) handlePutNamespaceQuota(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+	if s.ifDryRun(w, r, "quota.set", "namespace", ns, map[string]interface{}{
+		"namespace": ns,
+		"quota":     lim,
+	}) {
+		return
+	}
 	if s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.SetNamespaceQuota(r.Context(), ns, lim); err != nil {
 			s.recordAudit(r, "quota.set", "namespace", ns, "error", err.Error(), nil)
@@ -57,6 +63,9 @@ func (s *Server) handlePutNamespaceQuota(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleDeleteNamespaceQuota(w http.ResponseWriter, r *http.Request) {
 	ns := r.PathValue("namespace")
+	if s.ifDryRun(w, r, "quota.delete", "namespace", ns, map[string]interface{}{"namespace": ns}) {
+		return
+	}
 	if s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.DeleteNamespaceQuota(r.Context(), ns); err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

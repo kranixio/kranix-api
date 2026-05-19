@@ -149,6 +149,14 @@ func (s *Server) handleBulkWorkloads(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if s.ifDryRun(w, r, "bulk."+string(req.Operation), "workload", "", map[string]interface{}{
+		"operation": req.Operation,
+		"count":     len(req.Workloads),
+		"workloads": req.Workloads,
+	}) {
+		return
+	}
+
 	if s.Core != nil && s.Core.Enabled() {
 		resp, err := s.Core.BulkWorkloads(r.Context(), req)
 		if err != nil {

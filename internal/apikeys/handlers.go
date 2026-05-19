@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/kranix-io/kranix-api/internal/dryrun"
 	"github.com/kranix-io/kranix-packages/auth"
 )
 
@@ -46,11 +47,24 @@ func handleCreateAPIKey(service *Service) http.HandlerFunc {
 			}
 		}
 
+		if err := auth.ValidateAllowedIPs(req.AllowedIPs); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		// Extract user info from context (set by auth middleware)
 		createdBy := "system" // TODO: Get from context
 		tenantID := "default" // TODO: Get from context
 
-		apiKey, err := service.CreateAPIKey(req.Name, req.Permissions, createdBy, tenantID)
+		if dryrun.Respond(w, r, "apikey.create", "apikey", req.Name, map[string]interface{}{
+			"name":        req.Name,
+			"permissions": req.Permissions,
+			"allowedIps":  req.AllowedIPs,
+		}) {
+			return
+		}
+
+		apiKey, err := service.CreateAPIKey(req.Name, req.Permissions, req.AllowedIPs, createdBy, tenantID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -76,6 +90,7 @@ func handleListAPIKeys(service *Service) http.HandlerFunc {
 				Name:        key.Name,
 				Key:         "****" + key.Key[len(key.Key)-4:],
 				Permissions: key.Permissions,
+				AllowedIPs:  key.AllowedIPs,
 				ExpiresAt:   key.ExpiresAt,
 				CreatedAt:   key.CreatedAt,
 				CreatedBy:   key.CreatedBy,
@@ -113,6 +128,7 @@ func handleGetAPIKey(service *Service) http.HandlerFunc {
 			Name:        apiKey.Name,
 			Key:         "****" + apiKey.Key[len(apiKey.Key)-4:],
 			Permissions: apiKey.Permissions,
+			AllowedIPs:  apiKey.AllowedIPs,
 			ExpiresAt:   apiKey.ExpiresAt,
 			CreatedAt:   apiKey.CreatedAt,
 			CreatedBy:   apiKey.CreatedBy,
@@ -134,6 +150,10 @@ func handleRevokeAPIKey(service *Service) http.HandlerFunc {
 			return
 		}
 
+		if dryrun.Respond(w, r, "apikey.revoke", "apikey", id, map[string]interface{}{"id": id}) {
+			return
+		}
+
 		if err := service.RevokeAPIKey(id); err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -145,9 +165,10 @@ func handleRevokeAPIKey(service *Service) http.HandlerFunc {
 
 // CreateAPIKeyRequest represents a request to create an API key.
 type CreateAPIKeyRequest struct {
-	Name        string                 `json:"name"`
-	Permissions []auth.Permission      `json:"permissions"`
-	ExpiresAt   string                 `json:"expiresAt,omitempty"` // ISO 8601 format
+	Name        string            `json:"name"`
+	Permissions []auth.Permission `json:"permissions"`
+	AllowedIPs  []string          `json:"allowedIps,omitempty"`
+	ExpiresAt   string            `json:"expiresAt,omitempty"` // ISO 8601 format
 }
 
 // isValidResourceType checks if a resource type is valid.

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/kranix-io/kranix-packages/types"
 )
@@ -27,6 +28,9 @@ func (s *Server) handleUpdateWorkloadByID(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleDeleteWorkloadByID(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if s.ifDryRun(w, r, "workload.delete", "workload", id, map[string]interface{}{"id": id}) {
+		return
+	}
 	if id != "" && s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.DeleteWorkload(r.Context(), id); err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
@@ -41,6 +45,9 @@ func (s *Server) handleDeleteWorkloadByID(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleRestartWorkloadByID(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if s.ifDryRun(w, r, "workload.restart", "workload", id, map[string]interface{}{"id": id}) {
+		return
+	}
 	if id != "" && s.Core != nil && s.Core.Enabled() {
 		if err := s.Core.RestartWorkload(r.Context(), id); err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
@@ -88,8 +95,15 @@ func (s *Server) handlePostWorkloadDiff(w http.ResponseWriter, r *http.Request) 
 
 func searchQueryFromRequest(r *http.Request) types.WorkloadSearchQuery {
 	q := r.URL.Query()
+	allNS := queryFlagTrue(q, "all_namespaces", "allNamespaces", "cross_namespace", "crossNamespace")
+	ns := q.Get("namespace")
+	if allNS || ns == "*" {
+		allNS = true
+		ns = ""
+	}
 	return types.WorkloadSearchQuery{
-		Namespace:   q.Get("namespace"),
+		AllNamespaces: allNS,
+		Namespace:     ns,
 		Phase:       q.Get("phase"),
 		Status:      q.Get("status"),
 		Image:       q.Get("image"),
@@ -99,6 +113,16 @@ func searchQueryFromRequest(r *http.Request) types.WorkloadSearchQuery {
 		LabelKey:    q.Get("label"),
 		LabelValue:  q.Get("label_value"),
 	}
+}
+
+func queryFlagTrue(q map[string][]string, keys ...string) bool {
+	for _, k := range keys {
+		v := strings.ToLower(strings.TrimSpace(firstQueryValue(q, k)))
+		if v == "true" || v == "1" {
+			return true
+		}
+	}
+	return false
 }
 
 func firstQueryValue(q map[string][]string, keys ...string) string {

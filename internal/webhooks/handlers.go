@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/kranix-io/kranix-api/internal/dryrun"
 	"github.com/kranix-io/kranix-packages/types"
 )
 
@@ -24,6 +25,12 @@ func handleCreateWebhook(service *Service) http.HandlerFunc {
 		var webhook types.Webhook
 		if err := json.NewDecoder(r.Body).Decode(&webhook); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if dryrun.Respond(w, r, "webhook.create", "webhook", webhook.URL, map[string]interface{}{
+			"webhook": webhook,
+		}) {
 			return
 		}
 
@@ -85,6 +92,13 @@ func handleUpdateWebhook(service *Service) http.HandlerFunc {
 			return
 		}
 
+		if dryrun.Respond(w, r, "webhook.update", "webhook", id, map[string]interface{}{
+			"id":      id,
+			"webhook": webhook,
+		}) {
+			return
+		}
+
 		// Unregister old and register new
 		service.UnregisterWebhook(id)
 		webhook.ID = id
@@ -104,6 +118,10 @@ func handleDeleteWebhook(service *Service) http.HandlerFunc {
 		id := extractID(r.URL.Path)
 		if id == "" {
 			http.Error(w, "Invalid webhook ID", http.StatusBadRequest)
+			return
+		}
+
+		if dryrun.Respond(w, r, "webhook.delete", "webhook", id, map[string]interface{}{"id": id}) {
 			return
 		}
 
@@ -146,6 +164,10 @@ func handleTestWebhook(service *Service) http.HandlerFunc {
 		webhook, err := service.GetWebhook(id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		if dryrun.Respond(w, r, "webhook.test", "webhook", id, map[string]interface{}{"id": id}) {
 			return
 		}
 

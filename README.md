@@ -45,7 +45,7 @@ http://localhost:8080/api/v1
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/workloads` | Deploy a workload |
-| `GET` | `/workloads` | List all workloads |
+| `GET` | `/workloads` | List workloads (`?all_namespaces=true` for cross-namespace) |
 | `GET` | `/workloads/:id` | Get a single workload |
 | `PATCH` | `/workloads/:id` | Update workload spec |
 | `DELETE` | `/workloads/:id` | Remove a workload |
@@ -121,6 +121,18 @@ Supported token types:
 | OIDC | SSO / enterprise identity providers |
 
 Tokens are issued by `kranix-api` itself or via your OIDC provider. Configure in `config/auth.yaml`.
+
+### Dry-run (`?dryRun=true`)
+
+Append `?dryRun=true` (or `?dry_run=true`, or header `X-Dry-Run: true`) to any **mutating** request. The API returns a preview JSON payload with `dryRun: true` and does **not** apply changes (no core calls, no audit side effects beyond optional preview logging).
+
+### Cross-namespace workload list
+
+`GET /api/v1/workloads?all_namespaces=true` lists workloads across every namespace in one request (also accepts `cross_namespace=true` or `namespace=*`). Other filters (`phase`, `image`, `team`, etc.) still apply.
+
+### API key IP allowlist
+
+When creating an API key (`POST /api/v1/apikeys`), set `allowedIps` to an array of IPs or CIDRs (e.g. `["203.0.113.10", "10.0.0.0/8"]`). Requests using that key from any other client IP receive `403 Forbidden`. An empty list means no IP restriction.
 
 ---
 

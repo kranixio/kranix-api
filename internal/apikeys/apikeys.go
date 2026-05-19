@@ -19,14 +19,18 @@ func NewService() *Service {
 	}
 }
 
-// CreateAPIKey creates a new API key with specific permissions.
-func (s *Service) CreateAPIKey(name string, permissions []auth.Permission, createdBy string, tenantID string) (*auth.APIKey, error) {
+// CreateAPIKey creates a new API key with specific permissions and optional IP allowlist.
+func (s *Service) CreateAPIKey(name string, permissions []auth.Permission, allowedIPs []string, createdBy, tenantID string) (*auth.APIKey, error) {
+	if err := auth.ValidateAllowedIPs(allowedIPs); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	apiKey := auth.GenerateScopedAPIKey(name, permissions)
 	apiKey.CreatedBy = createdBy
 	apiKey.TenantID = tenantID
+	apiKey.AllowedIPs = append([]string(nil), allowedIPs...)
 
 	s.apiKeys[apiKey.ID] = apiKey
 	return apiKey, nil
