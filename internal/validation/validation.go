@@ -42,6 +42,19 @@ func ValidateWorkloadSpec(spec *types.WorkloadSpec) error {
 		}
 	}
 
+	if spec.CircuitBreaker != nil && spec.CircuitBreaker.Enabled {
+		cb := spec.CircuitBreaker
+		if cb.FailureThreshold < 0 || cb.SuccessThreshold < 0 ||
+			cb.OpenDurationSeconds < 0 || cb.HalfOpenMaxRequests < 0 {
+			return errors.Wrap(errors.ErrInvalidSpec, "circuitBreaker thresholds must be non-negative")
+		}
+	}
+	if spec.WarmStandby != nil && spec.WarmStandby.Enabled {
+		if spec.WarmStandby.Replicas < 0 {
+			return errors.Wrap(errors.ErrInvalidSpec, "warmStandby.replicas must be non-negative")
+		}
+	}
+
 	if spec.CronSchedule != nil && !spec.CronSchedule.Suspended {
 		schedule := strings.TrimSpace(spec.CronSchedule.Schedule)
 		if schedule == "" {
