@@ -42,16 +42,22 @@ func (s *Server) handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "message": "deploy accepted (core not configured)"})
 }
 
-// handleListWorkloads handles listing workloads.
+// handleListWorkloads handles listing and filtering workloads.
 func (s *Server) handleListWorkloads(w http.ResponseWriter, r *http.Request) {
-	namespace := r.URL.Query().Get("namespace")
-
-	// TODO: Delegate to kranix-core via gRPC
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"namespace": namespace,
-		"workloads": []types.Workload{},
-		"message":   "Not yet implemented",
+	q := searchQueryFromRequest(r)
+	if s.Core != nil && s.Core.Enabled() {
+		resp, err := s.Core.ListWorkloads(r.Context(), q)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+	writeJSON(w, http.StatusOK, types.WorkloadListResponse{
+		Workloads: []types.Workload{},
+		Count:     0,
+		Query:     q,
 	})
 }
 
@@ -225,37 +231,16 @@ func (s *Server) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleDiffWorkload handles workload diff requests.
+// handleDiffWorkload is a legacy fallback when core is not configured.
 func (s *Server) handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
-	// Extract workload name from URL path
-	// URL pattern: /api/v1/workloads/{name}/diff
-	workloadName := extractID(r.URL.Path)
-
-	var spec types.WorkloadSpec
-	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	workloadName := extractWorkloadIDFromPath(r.URL.Path, "diff")
+	if workloadName == "" {
+		workloadName = extractID(r.URL.Path)
 	}
-
-	// TODO: Delegate to kranix-core via gRPC to compute diff
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"workload_name": workloadName,
-		"changes": []map[string]interface{}{
-			{
-				"field":       "image",
-				"old_value":   spec.Image,
-				"new_value":   spec.Image,
-				"change_type": "modified",
-			},
-		},
-		"summary": map[string]interface{}{
-			"total_changes": 1,
-			"added":         0,
-			"modified":      1,
-			"removed":       0,
-		},
-		"message": "Diff computation not yet fully implemented - requires kranix-core integration",
+	writeJSON(w, http.StatusOK, types.WorkloadDiffResult{
+		WorkloadID: workloadName,
+		Changes:    []types.DiffChange{},
+		Summary:    types.DiffSummary{},
 	})
 }
 

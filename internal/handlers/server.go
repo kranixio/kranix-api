@@ -33,10 +33,18 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/workloads", s.handleDeployWorkload)
 	mux.HandleFunc("GET /api/v1/workloads", s.handleListWorkloads)
-	mux.HandleFunc("GET /api/v1/workloads/", s.handleGetWorkload)
-	mux.HandleFunc("PATCH /api/v1/workloads/", s.handleUpdateWorkload)
-	mux.HandleFunc("DELETE /api/v1/workloads/", s.handleDeleteWorkload)
-	mux.HandleFunc("POST /api/v1/workloads/", s.handleRestartWorkload)
+	mux.HandleFunc("GET /api/v1/workloads/{id}/diff", s.handleGetWorkloadDiff)
+	mux.HandleFunc("POST /api/v1/workloads/{id}/diff", s.handlePostWorkloadDiff)
+	mux.HandleFunc("GET /api/v1/workloads/{id}", s.handleGetWorkloadByID)
+	mux.HandleFunc("PATCH /api/v1/workloads/{id}", s.handleUpdateWorkloadByID)
+	mux.HandleFunc("DELETE /api/v1/workloads/{id}", s.handleDeleteWorkloadByID)
+	mux.HandleFunc("POST /api/v1/workloads/{id}/restart", s.handleRestartWorkloadByID)
+
+	mux.HandleFunc("GET /api/v1/quotas", s.handleListQuotas)
+	mux.HandleFunc("GET /api/v1/quotas/{namespace}/usage", s.handleNamespaceQuotaUsage)
+	mux.HandleFunc("GET /api/v1/quotas/{namespace}", s.handleGetNamespaceQuota)
+	mux.HandleFunc("PUT /api/v1/quotas/{namespace}", s.handlePutNamespaceQuota)
+	mux.HandleFunc("DELETE /api/v1/quotas/{namespace}", s.handleDeleteNamespaceQuota)
 
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleListPods)
 	mux.HandleFunc("GET /api/v1/pods/", s.handleGetPodLogs)

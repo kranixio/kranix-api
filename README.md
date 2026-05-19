@@ -223,6 +223,35 @@ audit:
 
 ---
 
+## Workload diff
+
+`GET /api/v1/workloads/{id}/diff` returns **desired spec vs live status** (phase, replicas, resources, image).  
+`POST /api/v1/workloads/{id}/diff` accepts a proposed `WorkloadSpec` body and diffs it against live state (used by the CLI).
+
+## Search and filter
+
+`GET /api/v1/workloads` supports query parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `namespace` | Filter by namespace |
+| `phase` / `status` | Filter by lifecycle phase (`Running`, `Pending`, …) |
+| `image` | Substring match on container image |
+| `team`, `environment`, `cost_center` | Match structured tags |
+| `label`, `label_value` | Match arbitrary workload labels |
+
+## Resource quota API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/quotas` | List namespace quotas |
+| `GET` | `/api/v1/quotas/{namespace}` | Get limits for a namespace |
+| `PUT` | `/api/v1/quotas/{namespace}` | Set or update limits (`HardResourceQuota` body) |
+| `DELETE` | `/api/v1/quotas/{namespace}` | Remove limits |
+| `GET` | `/api/v1/quotas/{namespace}/usage` | View aggregate usage vs limits |
+
+Proxies to **kranix-core** when `core.http_base_url` is configured.
+
 ## Bulk operations
 
 `POST /api/v1/workloads/bulk` runs **deploy**, **restart**, or **delete** for many workloads in one request. Set `continueOnError` to keep processing after individual failures. When `core.http_base_url` points at kranix-core, the API forwards the batch to core.

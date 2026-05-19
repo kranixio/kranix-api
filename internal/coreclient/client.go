@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -116,6 +117,110 @@ func (c *Client) GetAuditResource(ctx context.Context, resourceType, resourceID 
 		return nil, err
 	}
 	return out, nil
+}
+
+// ListWorkloads queries workloads with optional filters (proxies core JSON).
+func (c *Client) ListWorkloads(ctx context.Context, q types.WorkloadSearchQuery) (map[string]interface{}, error) {
+	params := url.Values{}
+	if q.Namespace != "" {
+		params.Set("namespace", q.Namespace)
+	}
+	if q.Phase != "" {
+		params.Set("phase", q.Phase)
+	}
+	if q.Status != "" {
+		params.Set("status", q.Status)
+	}
+	if q.Image != "" {
+		params.Set("image", q.Image)
+	}
+	if q.Team != "" {
+		params.Set("team", q.Team)
+	}
+	if q.Environment != "" {
+		params.Set("environment", q.Environment)
+	}
+	if q.CostCenter != "" {
+		params.Set("cost_center", q.CostCenter)
+	}
+	if q.LabelKey != "" {
+		params.Set("label", q.LabelKey)
+	}
+	if q.LabelValue != "" {
+		params.Set("label_value", q.LabelValue)
+	}
+	path := "/api/v1/workloads"
+	if enc := params.Encode(); enc != "" {
+		path += "?" + enc
+	}
+	var out map[string]interface{}
+	if err := c.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetWorkload returns a single workload from core.
+func (c *Client) GetWorkload(ctx context.Context, id string) (*types.Workload, error) {
+	var out types.Workload
+	if err := c.do(ctx, http.MethodGet, "/api/v1/workloads/"+id, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetWorkloadDiff compares desired (stored or proposed) spec vs live status.
+func (c *Client) GetWorkloadDiff(ctx context.Context, id string, proposed *types.WorkloadSpec) (*types.WorkloadDiffResult, error) {
+	if proposed != nil {
+		var out types.WorkloadDiffResult
+		if err := c.do(ctx, http.MethodPost, "/api/v1/workloads/"+id+"/diff", proposed, &out); err != nil {
+			return nil, err
+		}
+		return &out, nil
+	}
+	var out types.WorkloadDiffResult
+	if err := c.do(ctx, http.MethodGet, "/api/v1/workloads/"+id+"/diff", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListQuotas returns namespace quotas from core.
+func (c *Client) ListQuotas(ctx context.Context) (*types.ResourceQuotaListResponse, error) {
+	var out types.ResourceQuotaListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/quotas", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetNamespaceQuota returns quota limits for a namespace.
+func (c *Client) GetNamespaceQuota(ctx context.Context, namespace string) (*types.HardResourceQuota, error) {
+	var out types.HardResourceQuota
+	if err := c.do(ctx, http.MethodGet, "/api/v1/quotas/"+namespace, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetNamespaceQuota creates or updates namespace quota limits in core.
+func (c *Client) SetNamespaceQuota(ctx context.Context, namespace string, lim types.HardResourceQuota) error {
+	lim.Namespace = namespace
+	return c.do(ctx, http.MethodPut, "/api/v1/quotas/"+namespace, lim, nil)
+}
+
+// DeleteNamespaceQuota removes namespace quota limits.
+func (c *Client) DeleteNamespaceQuota(ctx context.Context, namespace string) error {
+	return c.do(ctx, http.MethodDelete, "/api/v1/quotas/"+namespace, nil, nil)
+}
+
+// GetNamespaceQuotaUsage returns usage vs limits for a namespace.
+func (c *Client) GetNamespaceQuotaUsage(ctx context.Context, namespace string) (*types.ResourceQuotaUsage, error) {
+	var out types.ResourceQuotaUsage
+	if err := c.do(ctx, http.MethodGet, "/api/v1/quotas/"+namespace+"/usage", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // NotifySecretRotated informs core that a secret version changed.
