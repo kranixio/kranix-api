@@ -67,6 +67,31 @@ func ValidateWorkloadSpec(spec *types.WorkloadSpec) error {
 	return nil
 }
 
+// ValidateWorkloadTags validates structured workload tags when present.
+func ValidateWorkloadTags(tags *types.WorkloadTags) error {
+	if tags == nil {
+		return nil
+	}
+	if t := strings.TrimSpace(tags.Team); t != "" && !isValidTagValue(t) {
+		return errors.Wrap(errors.ErrInvalidSpec, "invalid tags.team")
+	}
+	if e := strings.TrimSpace(tags.Environment); e != "" && !isValidTagValue(e) {
+		return errors.Wrap(errors.ErrInvalidSpec, "invalid tags.environment")
+	}
+	if c := strings.TrimSpace(tags.CostCenter); c != "" && !isValidTagValue(c) {
+		return errors.Wrap(errors.ErrInvalidSpec, "invalid tags.costCenter")
+	}
+	return nil
+}
+
+func isValidTagValue(v string) bool {
+	if len(v) > 63 {
+		return false
+	}
+	tagPattern := regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
+	return tagPattern.MatchString(v)
+}
+
 // ValidateNamespace validates a namespace.
 func ValidateNamespace(namespace *types.Namespace) error {
 	if namespace.Name == "" {
