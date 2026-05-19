@@ -119,9 +119,15 @@ func (c *Client) GetAuditResource(ctx context.Context, resourceType, resourceID 
 	return out, nil
 }
 
-// ListWorkloads queries workloads with optional filters (proxies core JSON).
-func (c *Client) ListWorkloads(ctx context.Context, q types.WorkloadSearchQuery) (map[string]interface{}, error) {
+// ListWorkloads queries workloads with optional filters and cursor pagination (proxies core JSON).
+func (c *Client) ListWorkloads(ctx context.Context, q types.WorkloadSearchQuery, limit, cursor string) (map[string]interface{}, error) {
 	params := url.Values{}
+	if limit != "" {
+		params.Set("limit", limit)
+	}
+	if cursor != "" {
+		params.Set("cursor", cursor)
+	}
 	if q.Namespace != "" {
 		params.Set("namespace", q.Namespace)
 	}

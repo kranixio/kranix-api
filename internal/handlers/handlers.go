@@ -42,21 +42,28 @@ func (s *Server) handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "message": "deploy accepted (core not configured)"})
 }
 
-// handleListWorkloads handles listing and filtering workloads.
+// handleListWorkloads handles listing, filtering, and cursor pagination.
 func (s *Server) handleListWorkloads(w http.ResponseWriter, r *http.Request) {
 	q := searchQueryFromRequest(r)
+	limit := r.URL.Query().Get("limit")
+	cursor := r.URL.Query().Get("cursor")
 	if s.Core != nil && s.Core.Enabled() {
-		resp, err := s.Core.ListWorkloads(r.Context(), q)
+		resp, err := s.Core.ListWorkloads(r.Context(), q, limit, cursor)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
+		if next, ok := resp["page_info"].(map[string]interface{}); ok {
+			if nc, ok := next["next_cursor"].(string); ok && nc != "" {
+				w.Header().Set("Link", "</api/v1/workloads?cursor="+nc+">; rel=\"next\"")
+			}
+		}
 		writeJSON(w, http.StatusOK, resp)
 		return
 	}
-	writeJSON(w, http.StatusOK, types.WorkloadListResponse{
+	writeJSON(w, http.StatusOK, types.PaginatedWorkloadListResponse{
 		Workloads: []types.Workload{},
-		Count:     0,
+		PageInfo:  types.PageInfo{Limit: 50},
 		Query:     q,
 	})
 }

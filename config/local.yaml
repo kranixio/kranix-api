@@ -67,3 +67,11 @@ apiversion:
   default_version: "1"
   header_name: "X-API-Version"
   query_param: "version"
+
+changelog_notifications:
+  enabled: true
+  email:
+    enabled: false
+    smtp_host: ""
+    smtp_port: "587"
+    from: "kranix-api@localhost"

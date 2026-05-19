@@ -15,6 +15,7 @@ import (
 	"github.com/kranix-io/kranix-api/internal/analytics"
 	"github.com/kranix-io/kranix-api/internal/apikeys"
 	"github.com/kranix-io/kranix-api/internal/audit"
+	"github.com/kranix-io/kranix-api/internal/changelognotify"
 	"github.com/kranix-io/kranix-api/internal/coreclient"
 	"github.com/kranix-io/kranix-api/internal/graphql"
 	"github.com/kranix-io/kranix-api/internal/handlers"
@@ -89,6 +90,17 @@ type Config struct {
 			ClientSecret string `yaml:"client_secret"`
 		} `yaml:"okta"`
 	} `yaml:"oidc_providers"`
+	ChangelogNotifications struct {
+		Enabled bool `yaml:"enabled"`
+		Email   struct {
+			Enabled  bool   `yaml:"enabled"`
+			SMTPHost string `yaml:"smtp_host"`
+			SMTPPort string `yaml:"smtp_port"`
+			Username string `yaml:"username"`
+			Password string `yaml:"password"`
+			From     string `yaml:"from"`
+		} `yaml:"email"`
+	} `yaml:"changelog_notifications"`
 }
 
 func main() {
@@ -200,7 +212,18 @@ func main() {
 		Enabled: config.Audit.Enabled,
 		Sink:    config.Audit.Sink,
 	})
-	handlerServer := handlers.NewServer(coreclient.New(coreHTTP), auditLogger)
+	changelogNotify := changelognotify.New(changelognotify.Config{
+		Enabled: config.ChangelogNotifications.Enabled,
+		Email: changelognotify.EmailConfig{
+			Enabled:  config.ChangelogNotifications.Email.Enabled,
+			SMTPHost: config.ChangelogNotifications.Email.SMTPHost,
+			SMTPPort: config.ChangelogNotifications.Email.SMTPPort,
+			Username: config.ChangelogNotifications.Email.Username,
+			Password: config.ChangelogNotifications.Email.Password,
+			From:     config.ChangelogNotifications.Email.From,
+		},
+	})
+	handlerServer := handlers.NewServer(coreclient.New(coreHTTP), auditLogger, versionManager, changelogNotify, webhookService)
 	handlerServer.RegisterRoutes(mux)
 	stream.RegisterRoutes(mux)
 

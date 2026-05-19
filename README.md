@@ -223,6 +223,37 @@ audit:
 
 ---
 
+## Pagination (cursor-based)
+
+Large workload and changelog lists support **cursor pagination**:
+
+| Parameter | Description |
+|-----------|-------------|
+| `limit` | Page size (default `50`, max `500`) |
+| `cursor` | Opaque token from previous `page_info.next_cursor` |
+
+```http
+GET /api/v1/workloads?namespace=prod&limit=50
+GET /api/v1/workloads?cursor=<token>
+```
+
+Response includes `page_info` with `has_more`, `next_cursor`, and `total_count`. A `Link: rel="next"` header is set when more pages exist.
+
+## Changelog breaking-change notifications
+
+Subscribe to **email** and/or **webhook** alerts when a **breaking** API release is published:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/changelog/subscriptions` | Register `webhookUrl` and/or `email` |
+| `GET` | `/api/v1/changelog/subscriptions` | List subscriptions |
+| `DELETE` | `/api/v1/changelog/subscriptions/{id}` | Remove subscription |
+| `POST` | `/api/v1/changelog/releases` | Publish version + entries; notifies on breaking changes |
+
+Registered **webhooks** with event `changelog.breaking` also receive payloads via the existing webhook system.
+
+Configure SMTP under `changelog_notifications.email` in config.
+
 ## Workload diff
 
 `GET /api/v1/workloads/{id}/diff` returns **desired spec vs live status** (phase, replicas, resources, image).  

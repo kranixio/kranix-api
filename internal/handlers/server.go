@@ -8,20 +8,26 @@ import (
 	"time"
 
 	"github.com/kranix-io/kranix-api/internal/audit"
+	"github.com/kranix-io/kranix-api/internal/changelognotify"
 	"github.com/kranix-io/kranix-api/internal/coreclient"
 	"github.com/kranix-io/kranix-api/internal/validation"
+	"github.com/kranix-io/kranix-api/internal/version"
+	"github.com/kranix-io/kranix-api/internal/webhooks"
 	"github.com/kranix-io/kranix-packages/types"
 )
 
 // Server holds shared handler dependencies.
 type Server struct {
-	Core  *coreclient.Client
-	Audit *audit.Logger
+	Core            *coreclient.Client
+	Audit           *audit.Logger
+	Version         *version.Manager
+	ChangelogNotify *changelognotify.Service
+	Webhooks        *webhooks.Service
 }
 
 // NewServer creates a handler server with core and audit dependencies.
-func NewServer(core *coreclient.Client, auditLog *audit.Logger) *Server {
-	return &Server{Core: core, Audit: auditLog}
+func NewServer(core *coreclient.Client, auditLog *audit.Logger, ver *version.Manager, changelog *changelognotify.Service, wh *webhooks.Service) *Server {
+	return &Server{Core: core, Audit: auditLog, Version: ver, ChangelogNotify: changelog, Webhooks: wh}
 }
 
 // RegisterRoutes registers HTTP handlers on mux.
@@ -30,6 +36,11 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/audit", s.handleListAudit)
 	mux.HandleFunc("GET /api/v1/audit/", s.handleGetAuditEntry)
 	mux.HandleFunc("GET /api/v1/audit/resources/{type}/{id}", s.handleAuditResource)
+
+	mux.HandleFunc("GET /api/v1/changelog/subscriptions", s.handleListChangelogSubscriptions)
+	mux.HandleFunc("POST /api/v1/changelog/subscriptions", s.handleCreateChangelogSubscription)
+	mux.HandleFunc("DELETE /api/v1/changelog/subscriptions/{id}", s.handleDeleteChangelogSubscription)
+	mux.HandleFunc("POST /api/v1/changelog/releases", s.handlePublishChangelogRelease)
 
 	mux.HandleFunc("POST /api/v1/workloads", s.handleDeployWorkload)
 	mux.HandleFunc("GET /api/v1/workloads", s.handleListWorkloads)
