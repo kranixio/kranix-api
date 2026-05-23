@@ -79,6 +79,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", s.handleGenerateManifests)
 	mux.HandleFunc("POST /api/v1/ai/ask", s.handleAIAsk)
+	mux.HandleFunc("GET /api/v1/cluster/health", s.handleGetClusterHealth)
+	mux.HandleFunc("GET /api/v1/cluster/suggestions", s.handleGetClusterSuggestions)
 	mux.HandleFunc("POST /api/v1/workloads/", s.handleDiffWorkload)
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleGetWorkloadCost)
 	mux.HandleFunc("GET /api/v1/cost/summary", s.handleGetCostSummary)
@@ -110,7 +112,16 @@ func (s *Server) recordAudit(r *http.Request, action, resourceType, resourceID, 
 	}
 	actor := r.Header.Get("X-Actor")
 	if actor == "" {
+		actor = r.Header.Get("X-Agent-Id")
+	}
+	if actor == "" {
 		actor = "api"
+	}
+	if details == nil {
+		details = map[string]interface{}{}
+	}
+	if agentID := r.Header.Get("X-Agent-Id"); agentID != "" {
+		details["agent_id"] = agentID
 	}
 	s.Audit.Log(types.AuditEntry{
 		Actor:        actor,

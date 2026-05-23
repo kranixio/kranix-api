@@ -71,8 +71,18 @@ http://localhost:8080/api/v1
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/workloads/:id/analyze` | AI-powered failure analysis |
+| `GET` | `/workloads/:id/analyze` | AI-powered failure analysis with remediation suggestions |
 | `POST` | `/manifests/generate` | Generate K8s manifests from intent |
+| `POST` | `/ai/ask` | AI assistant query with suggested action |
+
+### Cluster health & MCP suggestions
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/cluster/health` | Cluster-wide health summary (status, pod counts, degraded workloads) |
+| `GET` | `/cluster/suggestions` | Context-aware next-action recommendations for MCP agents (`?namespace=&workload=`) |
+
+Used by **kranix-mcp** tools `get_cluster_health`, `suggest_actions`, and auto-append suggestion hints.
 
 ### Rate limiting & Quotas
 
@@ -103,10 +113,7 @@ http://localhost:8080/api/v1
 
 ## Authentication
 
-All requests require an `Authorization` header:, API versioning
-│   ├── ratelimit/        # Rate limiting and quota enforcement
-│   ├── sse/              # SSE streaming service
-│   ├── apiversion/       # API versioning manager
+All requests require an `Authorization` header:
 
 ```
 Authorization: Bearer <token>
@@ -116,11 +123,22 @@ Supported token types:
 
 | Type | Use case |
 |---|---|
-| API key (`krane_...`) | CI/CD, service accounts |
+| API key (`krane_...`) | CI/CD, service accounts, MCP agents |
 | JWT | Human users via `kranix-cli` |
 | OIDC | SSO / enterprise identity providers |
 
 Tokens are issued by `kranix-api` itself or via your OIDC provider. Configure in `config/auth.yaml`.
+
+### MCP agent identity headers
+
+When called by **kranix-mcp**, requests may include agent identity headers for audit and impersonation tracking:
+
+| Header | Description |
+|--------|-------------|
+| `X-Agent-Id` | Authenticated MCP agent identifier (e.g. `claude-desktop`) |
+| `X-Actor` | Actor recorded in audit logs; defaults to `X-Agent-Id` or `api` |
+
+Audit entries store `agent_id` in `Details` when `X-Agent-Id` is present. This aligns MCP-side impersonation guards with the platform audit trail.
 
 ### Dry-run (`?dryRun=true`)
 
@@ -144,6 +162,7 @@ kranix-api/
 │   └── api/              # Entry point
 ├── internal/
 │   ├── handlers/         # HTTP handler functions (one file per resource)
+│   ├── suggestions/      # Cluster health and context-aware suggestion engine
 │   ├── grpc/             # gRPC service implementations
 │   ├── middleware/        # Auth, logging, rate limiting, CORS
 │   ├── validation/        # Request validation (schema + business rules)
@@ -313,16 +332,67 @@ Proxies to **kranix-core** when `core.http_base_url` is configured.
 - `GET /api/v1/audit/{entryId}` — single API audit record
 - `GET /api/v1/audit/resources/{type}/{id}` — merges API audit entries with **kranix-core** domain events (event sourcing) for full resource history
 
-Enable with `audit.enabled` in config; entries are written for deploy, restart, delete, and bulk operations.
+Enable with `audit.enabled` in config; entries are written for deploy, restart, delete, and bulk operations. MCP agents are recorded via `X-Agent-Id` / `X-Actor` headers.
+
+## Cluster health & MCP suggestions
+
+Endpoints consumed by **kranix-mcp** for context-aware agent guidance:
+
+### `GET /api/v1/cluster/health`
+
+Returns cluster-wide health derived from workload listings when kranix-core is connected:
+
+```json
+{
+  "status": "healthy",
+  "nodesReady": 1,
+  "nodesTotal": 1,
+  "podsRunning": 12,
+  "podsTotal": 14,
+  "degradedWorkloads": 0,
+  "lastChecked": "2026-05-23T10:00:00Z"
+}
+```
+
+Status values: `healthy`, `degraded`, `critical`, `unknown`.
+
+### `GET /api/v1/cluster/suggestions`
+
+Returns recommended next MCP tool actions based on cluster state and optional context:
+
+```http
+GET /api/v1/cluster/suggestions?namespace=prod&workload=api
+```
+
+```json
+{
+  "clusterStatus": "degraded",
+  "context": { "namespace": "prod", "workload": "api" },
+  "suggestions": [
+    {
+      "tool": "analyze_workload",
+      "reason": "Run failure analysis on the target workload",
+      "priority": "high",
+      "inputs": { "name": "api", "namespace": "prod" },
+      "confidence": 0.85
+    }
+  ],
+  "generatedAt": "2026-05-23T10:00:00Z"
+}
+```
+
+### `GET /api/v1/workloads/:id/analyze`
+
+Returns `types.AnalysisResult` including **`suggestions`** (remediation hints) alongside `issues` and `probableFix`. Shared types are defined in `kranix-packages/types`.
 
 ## Connectivity
 
 | Repo | Relationship |
 |---|---|
 | `kranix-cli` | Calls this API over HTTP |
-| `kranix-mcp` | Calls this API over HTTP on behalf of AI agents |
+| `kranix-mcp` | Calls this API over HTTP on behalf of AI agents; uses cluster health/suggestions endpoints and agent identity headers |
 | `kranix-core` | This API delegates all business logic to core |
-| `kranix-packages` | Imports shared types, errors, and auth primitives |
+| `kranix-packages` | Imports shared types (`types/mcp.go`), errors, and auth primitives (`auth/agent.go`) |
 
 ---
 
