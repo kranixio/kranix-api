@@ -14,6 +14,7 @@ import (
 
 	"github.com/kranix-io/kranix-api/internal/analytics"
 	"github.com/kranix-io/kranix-api/internal/apikeys"
+	"github.com/kranix-io/kranix-api/internal/approval"
 	"github.com/kranix-io/kranix-api/internal/audit"
 	"github.com/kranix-io/kranix-api/internal/changelognotify"
 	"github.com/kranix-io/kranix-api/internal/coreclient"
@@ -21,6 +22,7 @@ import (
 	"github.com/kranix-io/kranix-api/internal/handlers"
 	"github.com/kranix-io/kranix-api/internal/middleware"
 	"github.com/kranix-io/kranix-api/internal/oidc"
+	"github.com/kranix-io/kranix-api/internal/sse"
 	"github.com/kranix-io/kranix-api/internal/stream"
 	"github.com/kranix-io/kranix-api/internal/version"
 	"github.com/kranix-io/kranix-api/internal/webhooks"
@@ -101,6 +103,14 @@ type Config struct {
 			From     string `yaml:"from"`
 		} `yaml:"email"`
 	} `yaml:"changelog_notifications"`
+	SSE struct {
+		Enabled        bool `yaml:"enabled"`
+		MaxConnections int  `yaml:"max_connections"`
+	} `yaml:"sse"`
+	Approval struct {
+		Enabled    bool          `yaml:"enabled"`
+		DefaultTTL time.Duration `yaml:"default_ttl"`
+	} `yaml:"approval"`
 }
 
 func main() {
@@ -224,6 +234,24 @@ func main() {
 		},
 	})
 	handlerServer := handlers.NewServer(coreclient.New(coreHTTP), auditLogger, versionManager, changelogNotify, webhookService)
+
+	var sseService *sse.Service
+	if config.SSE.Enabled {
+		sseService = sse.NewService(logger)
+		sse.RegisterRoutes(mux, sseService)
+		handlerServer.SSE = sseService
+		log.Println("SSE service enabled at GET /api/sse")
+	}
+
+	if config.Approval.Enabled {
+		ttl := config.Approval.DefaultTTL
+		if ttl == 0 {
+			ttl = 10 * time.Minute
+		}
+		handlerServer.Approvals = approval.NewStore(ttl)
+		log.Println("Approval gate enabled at /api/v1/approvals")
+	}
+
 	handlerServer.RegisterRoutes(mux)
 	stream.RegisterRoutes(mux)
 

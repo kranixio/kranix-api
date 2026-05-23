@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kranix-io/kranix-packages/types"
 )
@@ -37,6 +38,10 @@ func (s *Server) handleDeleteWorkloadByID(w http.ResponseWriter, r *http.Request
 			return
 		}
 		s.recordAudit(r, "workload.delete", "workload", id, "success", "", nil)
+		s.broadcastClusterEvent("workload.deleted", map[string]interface{}{
+			"workloadId": id,
+			"namespace":  r.URL.Query().Get("namespace"),
+		}, r.URL.Query().Get("namespace"))
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -54,6 +59,13 @@ func (s *Server) handleRestartWorkloadByID(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		s.recordAudit(r, "workload.restart", "workload", id, "success", "", nil)
+		s.broadcastClusterEvent("workload.changed", &types.WorkloadStateChange{
+			WorkloadID: id,
+			Namespace:  r.URL.Query().Get("namespace"),
+			NewState:   "restarted",
+			ChangedAt:  time.Now().UTC(),
+			ChangedBy:  r.Header.Get("X-Actor"),
+		}, r.URL.Query().Get("namespace"))
 		writeJSON(w, http.StatusOK, map[string]string{"id": id, "status": "restarted"})
 		return
 	}

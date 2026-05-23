@@ -62,6 +62,10 @@ sse:
   enabled: true
   max_connections: 1000
 
+approval:
+  enabled: true
+  default_ttl: 10m
+
 apiversion:
   enabled: true
   default_version: "1"

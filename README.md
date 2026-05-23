@@ -115,6 +115,17 @@ Used by **kranix-mcp** tools `get_cluster_health`, `suggest_actions`, and auto-a
 | `GET` | `/api/sse/stats` | SSE connection statistics |
 | `POST` | `/api/sse/broadcast` | Broadcast events (testing) |
 
+### Approval gate
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/approvals` | Create a pending approval for a destructive MCP action |
+| `GET` | `/api/v1/approvals` | List pending approvals (optional `agent_id` filter) |
+| `GET` | `/api/v1/approvals/{id}` | Get approval status |
+| `POST` | `/api/v1/approvals/{id}/resolve` | Approve or deny a pending gate |
+
+Mutating workload handlers (deploy, restart, delete, rollback) broadcast events on the SSE stream when `sse.enabled: true`.
+
 ### API Versioning
 
 | Method | Path | Description |
@@ -531,6 +542,28 @@ The API provides Server-Sent Events (SSE) for real-time event streaming:
 - **Event types:** `workload.changed`, `workload.created`, `workload.deleted`
 - **Filtering:** Subscribe to specific namespaces or all namespaces
 - **Automatic reconnection:** Clients can reconnect with retry intervals
+- **MCP integration:** kranix-mcp exposes `subscribe_cluster_events` which polls this endpoint for agent push notifications
+- **Broadcasts:** Deploy, restart, delete, and rollback handlers emit events when SSE is enabled in config
+
+---
+
+## Approval gate
+
+Human-in-the-loop confirmation for destructive MCP actions:
+
+```yaml
+approval:
+  enabled: true
+  default_ttl: 10m
+```
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/v1/approvals` | Agent requests approval before delete/rollback/runbook execution |
+| `GET /api/v1/approvals/{id}` | Poll approval status |
+| `POST /api/v1/approvals/{id}/resolve` | Operator approves or denies |
+
+Resolved approvals are validated by kranix-mcp when the agent retries the target tool with `approval_id`.
 
 ---
 

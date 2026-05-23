@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/kranix-io/kranix-api/internal/validation"
 	"github.com/kranix-io/kranix-packages/types"
@@ -41,6 +42,13 @@ func (s *Server) handleDeployWorkload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.recordAudit(r, "workload.deploy", "workload", id, "success", "", nil)
+		s.broadcastClusterEvent("workload.changed", &types.WorkloadStateChange{
+			WorkloadID: id,
+			Namespace:  spec.Namespace,
+			NewState:   "deployed",
+			ChangedAt:  time.Now().UTC(),
+			ChangedBy:  r.Header.Get("X-Actor"),
+		}, spec.Namespace)
 		writeJSON(w, http.StatusCreated, map[string]string{"id": id, "status": "deployed"})
 		return
 	}

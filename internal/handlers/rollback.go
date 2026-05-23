@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/kranix-io/kranix-packages/types"
 )
@@ -51,6 +52,13 @@ func (s *Server) handleRollbackWorkloadByID(w http.ResponseWriter, r *http.Reque
 		s.recordAudit(r, "workload.rollback", "workload", id, "success", "", map[string]interface{}{
 			"revisionId": result.RevisionID,
 		})
+		s.broadcastClusterEvent("workload.changed", &types.WorkloadStateChange{
+			WorkloadID: id,
+			Namespace:  result.Namespace,
+			NewState:   "rolled_back",
+			ChangedAt:  time.Now().UTC(),
+			ChangedBy:  r.Header.Get("X-Actor"),
+		}, result.Namespace)
 		writeJSON(w, http.StatusOK, result)
 		return
 	}

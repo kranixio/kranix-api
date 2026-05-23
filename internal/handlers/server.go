@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/kranix-io/kranix-api/internal/audit"
+	"github.com/kranix-io/kranix-api/internal/approval"
 	"github.com/kranix-io/kranix-api/internal/changelognotify"
 	"github.com/kranix-io/kranix-api/internal/coreclient"
+	"github.com/kranix-io/kranix-api/internal/sse"
 	"github.com/kranix-io/kranix-api/internal/validation"
 	"github.com/kranix-io/kranix-api/internal/version"
 	"github.com/kranix-io/kranix-api/internal/webhooks"
@@ -23,11 +25,30 @@ type Server struct {
 	Version         *version.Manager
 	ChangelogNotify *changelognotify.Service
 	Webhooks        *webhooks.Service
+	SSE       *sse.Service
+	Approvals *approval.Store
 }
 
 // NewServer creates a handler server with core and audit dependencies.
 func NewServer(core *coreclient.Client, auditLog *audit.Logger, ver *version.Manager, changelog *changelognotify.Service, wh *webhooks.Service) *Server {
 	return &Server{Core: core, Audit: auditLog, Version: ver, ChangelogNotify: changelog, Webhooks: wh}
+}
+
+func (s *Server) broadcastClusterEvent(event string, data interface{}, namespace string) {
+	if s.SSE == nil {
+		return
+	}
+	if event == "workload.changed" {
+		if change, ok := data.(*types.WorkloadStateChange); ok {
+			s.SSE.BroadcastWorkloadChange(change)
+			return
+		}
+	}
+	filter := map[string]string{}
+	if namespace != "" {
+		filter["namespace"] = namespace
+	}
+	s.SSE.Broadcast(event, data, filter)
 }
 
 // RegisterRoutes registers HTTP handlers on mux.
@@ -87,6 +108,10 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleGetWorkloadCost)
 	mux.HandleFunc("GET /api/v1/cost/summary", s.handleGetCostSummary)
 	mux.HandleFunc("POST /api/v1/cost/estimate", s.handleEstimateDeploymentCost)
+	mux.HandleFunc("POST /api/v1/approvals", s.handleCreateApproval)
+	mux.HandleFunc("GET /api/v1/approvals", s.handleListApprovals)
+	mux.HandleFunc("GET /api/v1/approvals/{id}", s.handleGetApproval)
+	mux.HandleFunc("POST /api/v1/approvals/{id}/resolve", s.handleResolveApproval)
 	mux.HandleFunc("GET /api/v1/templates", s.handleListTemplates)
 	mux.HandleFunc("POST /api/v1/templates/get", s.handleGetTemplate)
 	mux.HandleFunc("POST /api/v1/coordination/tasks", s.handleCreateTask)
