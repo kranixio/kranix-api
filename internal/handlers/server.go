@@ -50,6 +50,8 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/workloads/{id}", s.handleUpdateWorkloadByID)
 	mux.HandleFunc("DELETE /api/v1/workloads/{id}", s.handleDeleteWorkloadByID)
 	mux.HandleFunc("POST /api/v1/workloads/{id}/restart", s.handleRestartWorkloadByID)
+	mux.HandleFunc("GET /api/v1/workloads/{id}/revisions", s.handleListRevisionsByID)
+	mux.HandleFunc("POST /api/v1/workloads/{id}/rollback", s.handleRollbackWorkloadByID)
 
 	mux.HandleFunc("GET /api/v1/quotas", s.handleListQuotas)
 	mux.HandleFunc("GET /api/v1/quotas/{namespace}/usage", s.handleNamespaceQuotaUsage)
@@ -84,6 +86,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workloads/", s.handleDiffWorkload)
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleGetWorkloadCost)
 	mux.HandleFunc("GET /api/v1/cost/summary", s.handleGetCostSummary)
+	mux.HandleFunc("POST /api/v1/cost/estimate", s.handleEstimateDeploymentCost)
 	mux.HandleFunc("GET /api/v1/templates", s.handleListTemplates)
 	mux.HandleFunc("POST /api/v1/templates/get", s.handleGetTemplate)
 	mux.HandleFunc("POST /api/v1/coordination/tasks", s.handleCreateTask)

@@ -88,6 +88,25 @@ func (c *Client) RestartWorkload(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodPost, "/api/v1/workloads/"+id+"/restart", nil, nil)
 }
 
+// ListRevisions returns rollback revision history for a workload.
+func (c *Client) ListRevisions(ctx context.Context, id string) (*types.RevisionListResponse, error) {
+	var out types.RevisionListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/workloads/"+id+"/revisions", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RollbackWorkload reverts a workload to a stored revision.
+func (c *Client) RollbackWorkload(ctx context.Context, id, revisionID string) (*types.RollbackResult, error) {
+	body := types.RollbackRequest{RevisionID: revisionID}
+	var out types.RollbackResult
+	if err := c.do(ctx, http.MethodPost, "/api/v1/workloads/"+id+"/rollback", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // DeleteWorkload removes a workload from core.
 func (c *Client) DeleteWorkload(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/api/v1/workloads/"+id, nil, nil)
