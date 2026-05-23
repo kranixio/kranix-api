@@ -14,6 +14,7 @@
 - Validates **cron schedules** (standard 5-field expression, optional IANA **`timeZone`**, **`allow`/`forbid`/`replace`** concurrency policy), **GPU** specs, **cross-namespace traffic** namespace names, and **`scheduling.workloadPriority`** (**`critical`** | **`high`** | **`normal`** | **`low`**) via `internal/validation` (spot / preemption flags are passed through to core and runtime)
 - Translates HTTP/gRPC requests into `kranix-core` operations
 - Streams logs and events back to callers over SSE / gRPC streams
+- Exposes **workload rollback** (revision history + revert) and **cost estimation** (pre-deploy and deployed)
 - Emits audit logs for every mutating action
 - Enforces rate limiting and per-namespace resource quotas
 - Supports API versioning with deprecation warnings
@@ -50,6 +51,18 @@ http://localhost:8080/api/v1
 | `PATCH` | `/workloads/:id` | Update workload spec |
 | `DELETE` | `/workloads/:id` | Remove a workload |
 | `POST` | `/workloads/:id/restart` | Restart a workload |
+| `GET` | `/workloads/:id/revisions` | List rollback revision history |
+| `POST` | `/workloads/:id/rollback` | Revert workload to a previous revision |
+
+### Cost estimation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/cost/estimate` | Estimate cost for a proposed deployment spec (pre-deploy) |
+| `GET` | `/workloads/:id/cost` | Cost breakdown for a deployed workload (`?namespace=&duration=`) |
+| `GET` | `/cost/summary` | Namespace cost rollup (`?namespace=&duration=`) |
+
+Used by **kranix-mcp** tools `estimate_deployment_cost`, and by **kranix-cli** `kranix cost`.
 
 ### Pods / containers
 
@@ -161,7 +174,7 @@ kranix-api/
 ├── cmd/
 │   └── api/              # Entry point
 ├── internal/
-│   ├── handlers/         # HTTP handler functions (one file per resource)
+│   ├── handlers/         # HTTP handlers (workloads, rollback, cost, cluster, …)
 │   ├── suggestions/      # Cluster health and context-aware suggestion engine
 │   ├── grpc/             # gRPC service implementations
 │   ├── middleware/        # Auth, logging, rate limiting, CORS
@@ -385,14 +398,102 @@ GET /api/v1/cluster/suggestions?namespace=prod&workload=api
 
 Returns `types.AnalysisResult` including **`suggestions`** (remediation hints) alongside `issues` and `probableFix`. Shared types are defined in `kranix-packages/types`.
 
+## Workload rollback
+
+Endpoints for revision history and instant rollback (proxied to **kranix-core** when configured):
+
+### `GET /api/v1/workloads/{id}/revisions`
+
+Returns stored spec snapshots (newest first):
+
+```json
+{
+  "workloadId": "api",
+  "namespace": "production",
+  "count": 3,
+  "revisions": [
+    {
+      "id": "a1b2c3d4",
+      "recordedAt": "2026-05-23T10:00:00Z",
+      "spec": { "image": "api:v1", "replicas": 2 },
+      "changeReason": "update"
+    }
+  ]
+}
+```
+
+### `POST /api/v1/workloads/{id}/rollback`
+
+Reverts to a specific revision. Omit `revisionId` to roll back to the immediately previous version:
+
+```json
+{ "revisionId": "a1b2c3d4" }
+```
+
+```json
+{
+  "workloadId": "api",
+  "namespace": "production",
+  "revisionId": "a1b2c3d4",
+  "status": "rolled_back",
+  "restoredImage": "api:v1"
+}
+```
+
+Audit action: `workload.rollback`. Used by **kranix-mcp** tools `rollback_workload` and `list_workload_revisions`.
+
+## Cost estimation
+
+Pre-deploy and deployed workload cost endpoints using the shared `kranix-packages/cost` estimator:
+
+### `POST /api/v1/cost/estimate`
+
+Estimate cost before deploying:
+
+```json
+{
+  "name": "api",
+  "namespace": "staging",
+  "duration": "30d",
+  "spec": {
+    "image": "nginx:latest",
+    "replicas": 3,
+    "resources": { "cpuRequest": "100m", "cpuLimit": "500m" }
+  }
+}
+```
+
+```json
+{
+  "workloadName": "api",
+  "namespace": "staging",
+  "totalCost": 42.50,
+  "computeCost": 36.12,
+  "monthlyCostPerReplica": 14.17,
+  "rightsizing": {
+    "recommendedCpuRequest": "100m",
+    "recommendedCpuLimit": "250m",
+    "reason": "low observed utilization vs CPU limit — candidate for rightsizing"
+  }
+}
+```
+
+### `GET /api/v1/workloads/{id}/cost`
+
+Cost for an existing workload. When core is connected, uses live spec; otherwise falls back to the shared estimator.
+
+### `GET /api/v1/cost/summary`
+
+Namespace-level rollup with top workloads by cost.
+
 ## Connectivity
 
 | Repo | Relationship |
 |---|---|
 | `kranix-cli` | Calls this API over HTTP |
-| `kranix-mcp` | Calls this API over HTTP on behalf of AI agents; uses cluster health/suggestions endpoints and agent identity headers |
-| `kranix-core` | This API delegates all business logic to core |
-| `kranix-packages` | Imports shared types (`types/mcp.go`), errors, and auth primitives (`auth/agent.go`) |
+| `kranix-mcp` | Calls this API over HTTP on behalf of AI agents; rollback, cost estimate, cluster health/suggestions, agent identity headers |
+| `kranix-core` | This API delegates all business logic to core (including rollback via rollout history) |
+| `kranix-packages` | Imports shared types (`types/mcp.go`, `types/cost.go`, `types/rollback.go`), cost estimator, auth |
 
 ---
 

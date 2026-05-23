@@ -254,66 +254,6 @@ func (s *Server) handleDiffWorkload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleGetWorkloadCost handles getting cost breakdown for a workload.
-func (s *Server) handleGetWorkloadCost(w http.ResponseWriter, r *http.Request) {
-	// Extract workload name from URL path
-	workloadName := extractID(r.URL.Path)
-	namespace := r.URL.Query().Get("namespace")
-	duration := r.URL.Query().Get("duration")
-
-	// TODO: Delegate to kranix-core via gRPC to get cost data
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"workload_name": workloadName,
-		"namespace":     namespace,
-		"duration":      duration,
-		"total_cost":    42.50,
-		"compute_cost":  35.00,
-		"storage_cost":  5.00,
-		"network_cost":  2.50,
-		"breakdown": []map[string]interface{}{
-			{
-				"resource": "CPU",
-				"cost":     25.00,
-				"usage":    "500m",
-			},
-			{
-				"resource": "Memory",
-				"cost":     10.00,
-				"usage":    "1Gi",
-			},
-		},
-		"message": "Cost calculation not yet fully implemented - requires kranix-core integration",
-	})
-}
-
-// handleGetCostSummary handles getting cost summary for a namespace.
-func (s *Server) handleGetCostSummary(w http.ResponseWriter, r *http.Request) {
-	namespace := r.URL.Query().Get("namespace")
-	duration := r.URL.Query().Get("duration")
-
-	// TODO: Delegate to kranix-core via gRPC to get cost summary
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"namespace":      namespace,
-		"duration":       duration,
-		"total_cost":     150.00,
-		"workload_count": 5,
-		"average_cost":   30.00,
-		"top_cost_workloads": []map[string]interface{}{
-			{
-				"workload_name": "app-1",
-				"total_cost":    50.00,
-			},
-			{
-				"workload_name": "app-2",
-				"total_cost":    40.00,
-			},
-		},
-		"message": "Cost summary not yet fully implemented - requires kranix-core integration",
-	})
-}
-
 // handleListTemplates handles listing available templates.
 func (s *Server) handleListTemplates(w http.ResponseWriter, r *http.Request) {
 	// TODO: Delegate to kranix-core or template service
