@@ -101,6 +101,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleGetPredictions)
 	mux.HandleFunc("GET /api/v1/workloads/", s.handleAnalyzeWorkload)
 	mux.HandleFunc("POST /api/v1/manifests/generate", s.handleGenerateManifests)
+	mux.HandleFunc("POST /api/v1/templates/kranixapp", s.handleGenerateKranixAppTemplate)
 	mux.HandleFunc("POST /api/v1/ai/ask", s.handleAIAsk)
 	mux.HandleFunc("GET /api/v1/cluster/health", s.handleGetClusterHealth)
 	mux.HandleFunc("GET /api/v1/cluster/suggestions", s.handleGetClusterSuggestions)

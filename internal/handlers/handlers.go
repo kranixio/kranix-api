@@ -218,15 +218,6 @@ func (s *Server) handleDeleteNamespace(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleGenerateManifests handles generating K8s manifests from intent.
-func (s *Server) handleGenerateManifests(w http.ResponseWriter, r *http.Request) {
-	// TODO: Delegate to kranix-core via gRPC
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Not yet implemented",
-	})
-}
-
 // handleAIAsk handles AI assistant queries.
 func (s *Server) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 	var req map[string]interface{}

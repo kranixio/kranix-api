@@ -85,7 +85,8 @@ Used by **kranix-mcp** tools `estimate_deployment_cost`, and by **kranix-cli** `
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/workloads/:id/analyze` | AI-powered failure analysis with remediation suggestions |
-| `POST` | `/manifests/generate` | Generate K8s manifests from intent |
+| `POST` | `/manifests/generate` | Generate K8s/KranixApp manifests from intent (legacy response: `{manifest}`) |
+| `POST` | `/templates/kranixapp` | Generate full KranixApp template with parsed metadata |
 | `POST` | `/ai/ask` | AI assistant query with suggested action |
 
 ### Cluster health & MCP suggestions
@@ -564,6 +565,31 @@ approval:
 | `POST /api/v1/approvals/{id}/resolve` | Operator approves or denies |
 
 Resolved approvals are validated by kranix-mcp when the agent retries the target tool with `approval_id`.
+
+---
+
+## KranixApp template generation
+
+Generate full `kranix.io/v1alpha1` KranixApp manifests from natural language or structured input:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/manifests/generate` | Legacy endpoint — returns `{ "manifest": "<yaml>" }` |
+| `POST` | `/api/v1/templates/kranixapp` | Full response with parsed fields, confidence, and YAML |
+
+**Request body** (`KranixAppTemplateRequest`):
+
+```json
+{
+  "description": "deploy api-server to staging with 2 replicas and spot instances",
+  "name": "api-server",
+  "namespace": "staging",
+  "profile": "spot",
+  "features": ["auto-heal"]
+}
+```
+
+Generation logic lives in `kranix-packages/template` and is shared across kranix-api and kranix-mcp.
 
 ---
 
