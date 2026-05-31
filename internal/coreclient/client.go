@@ -292,3 +292,47 @@ func (c *Client) DrainNode(ctx context.Context, req types.NodeDrainRequest) (*ty
 	}
 	return &result, nil
 }
+
+func (c *Client) CheckpointWorkload(ctx context.Context, req types.CheckpointRequest) (*types.CheckpointResult, error) {
+	if req.WorkloadID == "" {
+		return nil, fmt.Errorf("workloadId is required")
+	}
+	var result types.CheckpointResult
+	path := fmt.Sprintf("/api/v1/workloads/%s/checkpoint", req.WorkloadID)
+	if err := c.do(ctx, http.MethodPost, path, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) RestoreWorkload(ctx context.Context, req types.RestoreRequest) (*types.RestoreResult, error) {
+	if req.WorkloadID == "" {
+		return nil, fmt.Errorf("workloadId is required")
+	}
+	var result types.RestoreResult
+	path := fmt.Sprintf("/api/v1/workloads/%s/restore", req.WorkloadID)
+	if err := c.do(ctx, http.MethodPost, path, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *Client) ListCheckpoints(ctx context.Context, workloadID, namespace string) ([]types.CheckpointResult, error) {
+	path := fmt.Sprintf("/api/v1/workloads/%s/checkpoints", workloadID)
+	if namespace != "" {
+		path += "?namespace=" + namespace
+	}
+	var list []types.CheckpointResult
+	if err := c.do(ctx, http.MethodGet, path, nil, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (c *Client) ListRuntimePlugins(ctx context.Context) (*types.RuntimePluginListResponse, error) {
+	var resp types.RuntimePluginListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/runtime/plugins", nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}

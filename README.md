@@ -618,6 +618,48 @@ Proxied to kranix-core (and kranix-runtime when `NodeOperations` is wired):
 
 ---
 
+## Runtime checkpoint, volumes, bandwidth, and plugins
+
+Proxied to kranix-core (and kranix-runtime when extended ops are wired):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/workloads/{id}/checkpoint` | Pause container (Docker) or scale Deployment to 0 (Kubernetes) |
+| `POST` | `/api/v1/workloads/{id}/restore` | Resume from checkpoint |
+| `GET` | `/api/v1/workloads/{id}/checkpoints` | List checkpoint metadata for a workload |
+| `GET` | `/api/v1/runtime/plugins` | List registered runtime backend plugins |
+
+**Restore request body:**
+
+```json
+{
+  "checkpointId": "ckpt-123",
+  "namespace": "default"
+}
+```
+
+**Volume and bandwidth fields** on workload create/update (`WorkloadSpec`):
+
+```json
+{
+  "volumes": [
+    {
+      "name": "data",
+      "size": "10Gi",
+      "mountPath": "/data",
+      "autoCleanup": true
+    }
+  ],
+  "networkBandwidth": {
+    "enabled": true,
+    "egressLimit": "10Mbit",
+    "ingressLimit": "5Mbit"
+  }
+}
+```
+
+---
+
 ## API Versioning
 
 The API supports multiple versions running side by side:
