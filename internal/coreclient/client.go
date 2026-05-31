@@ -270,3 +270,25 @@ func (c *Client) NotifySecretRotated(ctx context.Context, namespace, name, versi
 	}
 	return ids, nil
 }
+
+// ListNodeHealth returns runtime node health scores from core.
+func (c *Client) ListNodeHealth(ctx context.Context) (*types.NodeHealthListResponse, error) {
+	var resp types.NodeHealthListResponse
+	if err := c.do(ctx, http.MethodGet, "/api/v1/nodes/health", nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// DrainNode safely evicts workloads from a node before maintenance.
+func (c *Client) DrainNode(ctx context.Context, req types.NodeDrainRequest) (*types.NodeDrainResult, error) {
+	if req.NodeName == "" {
+		return nil, fmt.Errorf("nodeName is required")
+	}
+	var result types.NodeDrainResult
+	path := fmt.Sprintf("/api/v1/nodes/%s/drain", req.NodeName)
+	if err := c.do(ctx, http.MethodPost, path, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

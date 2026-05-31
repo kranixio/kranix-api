@@ -94,6 +94,8 @@ Used by **kranix-mcp** tools `estimate_deployment_cost`, and by **kranix-cli** `
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/cluster/health` | Cluster-wide health summary (status, pod counts, degraded workloads) |
+| `GET` | `/nodes/health` | Per-node and per-backend health scores (0–100) |
+| `POST` | `/nodes/{name}/drain` | Cordon node and evict workloads before maintenance |
 | `GET` | `/cluster/suggestions` | Context-aware next-action recommendations for MCP agents (`?namespace=&workload=`) |
 
 Used by **kranix-mcp** tools `get_cluster_health`, `suggest_actions`, and auto-append suggestion hints.
@@ -590,6 +592,29 @@ Generate full `kranix.io/v1alpha1` KranixApp manifests from natural language or 
 ```
 
 Generation logic lives in `kranix-packages/template` and is shared across kranix-api and kranix-mcp.
+
+---
+
+## Runtime node health and draining
+
+Proxied to kranix-core (and kranix-runtime when `NodeOperations` is wired):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/nodes/health` | Node and backend health scores 0–100 |
+| `POST` | `/api/v1/nodes/{name}/drain` | Cordon node, apply drain taint, evict pods |
+
+**Drain request body:**
+
+```json
+{
+  "gracePeriodSeconds": 30,
+  "ignoreDaemonSets": true,
+  "reason": "maintenance"
+}
+```
+
+**Multi-arch:** set `scheduling.architecture` to `amd64` or `arm64` on workload specs; runtime applies `kubernetes.io/arch` node selection.
 
 ---
 
