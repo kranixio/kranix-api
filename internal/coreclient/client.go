@@ -336,3 +336,15 @@ func (c *Client) ListRuntimePlugins(ctx context.Context) (*types.RuntimePluginLi
 	}
 	return &resp, nil
 }
+
+func (c *Client) MigrateWorkload(ctx context.Context, req types.WorkloadMigrationRequest) (*types.WorkloadMigrationResult, error) {
+	if req.WorkloadID == "" {
+		return nil, fmt.Errorf("workloadId is required")
+	}
+	var result types.WorkloadMigrationResult
+	path := fmt.Sprintf("/api/v1/workloads/%s/migrate", req.WorkloadID)
+	if err := c.do(ctx, http.MethodPost, path, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}

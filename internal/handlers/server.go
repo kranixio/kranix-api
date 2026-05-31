@@ -108,6 +108,7 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/workloads/{id}/restore", s.handleRestoreWorkload)
 	mux.HandleFunc("GET /api/v1/workloads/{id}/checkpoints", s.handleListCheckpoints)
 	mux.HandleFunc("GET /api/v1/runtime/plugins", s.handleListRuntimePlugins)
+	mux.HandleFunc("POST /api/v1/workloads/{id}/migrate", s.handleMigrateWorkload)
 	mux.HandleFunc("POST /api/v1/ai/ask", s.handleAIAsk)
 	mux.HandleFunc("GET /api/v1/cluster/health", s.handleGetClusterHealth)
 	mux.HandleFunc("GET /api/v1/cluster/suggestions", s.handleGetClusterSuggestions)

@@ -660,6 +660,51 @@ Proxied to kranix-core (and kranix-runtime when extended ops are wired):
 
 ---
 
+## Workload migration, probes, and node placement
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/workloads/{id}/migrate` | Move workload between backends with optional zero-downtime cutover |
+
+**Migration request body:**
+
+```json
+{
+  "sourceBackend": "docker",
+  "targetBackend": "kubernetes",
+  "zeroDowntime": true,
+  "readyTimeout": "5m"
+}
+```
+
+**Probes** on workload create/update — startup blocks liveness/readiness until the app initializes:
+
+```json
+{
+  "probes": {
+    "startup": { "type": "http", "path": "/ready", "port": 8080, "periodSeconds": 5, "failureThreshold": 30 },
+    "liveness": { "type": "http", "path": "/healthz", "port": 8080 },
+    "readiness": { "type": "tcp", "port": 8080 }
+  }
+}
+```
+
+**Node placement** — target nodes by region, zone, or hardware:
+
+```json
+{
+  "scheduling": {
+    "nodePlacement": {
+      "region": "eu-west-1",
+      "hardwareType": "gpu-a100",
+      "requiredLabels": { "kranix.io/tier": "production" }
+    }
+  }
+}
+```
+
+---
+
 ## API Versioning
 
 The API supports multiple versions running side by side:
